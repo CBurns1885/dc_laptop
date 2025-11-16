@@ -319,40 +319,59 @@ def _score_grid(lam: float, mu: float, rho: float,
 # MATCH PRICING (ENHANCED)
 # ============================================================================
 
-def price_match(params: DCParams, home: str, away: str, 
+def price_match(params: DCParams, home: str, away: str,
                 use_form: bool = True,
-                max_goals: int = MAX_GOALS) -> Dict[str, float]:
+                max_goals: int = MAX_GOALS,
+                home_rest_days: Optional[int] = None,
+                away_rest_days: Optional[int] = None) -> Dict[str, float]:
     """
     Calculate probabilities for all markets with form adjustment
-    
+
     Args:
         params: Fitted DC parameters
         home: Home team name
         away: Away team name
         use_form: Whether to apply recent form adjustments
         max_goals: Maximum goals for calculations
-    
+        home_rest_days: Days since home team's last match (for fixture congestion adjustment)
+        away_rest_days: Days since away team's last match (for fixture congestion adjustment)
+
     Returns:
         Dictionary of market probabilities
     """
     # Check if teams exist in params
     if home not in params.attack or away not in params.attack:
         return {}
-    
+
     # Base expected goals
     lam = np.exp(params.attack[home] - params.defence[away] + params.home_adv)
     mu = np.exp(params.attack[away] - params.defence[home])
-    
+
     # Apply recent form adjustments if available and requested
     if use_form and params.recent_attack:
         form_mult_home_att = params.recent_attack.get(home, 1.0)
         form_mult_away_att = params.recent_attack.get(away, 1.0)
         form_mult_home_def = params.recent_defence.get(home, 1.0)
         form_mult_away_def = params.recent_defence.get(away, 1.0)
-        
+
         # Adjust expected goals by form
         lam *= form_mult_home_att * (1 / form_mult_away_def)
         mu *= form_mult_away_att * (1 / form_mult_home_def)
+
+    # ENHANCEMENT #1: Fixture Congestion Adjustment (Rest Days)
+    # Research shows teams with short rest score significantly fewer goals
+    if home_rest_days is not None:
+        if home_rest_days < 4:
+            lam *= 0.88  # 12% reduction for short rest (<4 days)
+        elif home_rest_days < 7:
+            lam *= 0.95  # 5% reduction for medium rest (4-6 days)
+        # 7+ days = no adjustment (normal rest)
+
+    if away_rest_days is not None:
+        if away_rest_days < 4:
+            mu *= 0.88  # 12% reduction for short rest
+        elif away_rest_days < 7:
+            mu *= 0.95  # 5% reduction for medium rest
     
     # Generate score probability grid
     P = _score_grid(lam, mu, params.rho, max_goals)

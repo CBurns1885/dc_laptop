@@ -417,11 +417,25 @@ def _dc_probs_for_rows(train_df: pd.DataFrame, rows_df: pd.DataFrame, target: st
     """DC probabilities for BTTS and O/U markets only"""
     params = dc_fit_all(train_df[["League","Date","HomeTeam","AwayTeam","FTHG","FTAG"]])
     out = []
-    for _, r in rows_df[["League","HomeTeam","AwayTeam"]].iterrows():
+
+    # Prepare column list - include rest days if available
+    cols = ["League","HomeTeam","AwayTeam"]
+    if "home_rest_days" in rows_df.columns:
+        cols.append("home_rest_days")
+    if "away_rest_days" in rows_df.columns:
+        cols.append("away_rest_days")
+
+    for _, r in rows_df[cols].iterrows():
         lg, ht, at = r["League"], r["HomeTeam"], r["AwayTeam"]
+
+        # Extract rest days if available (ENHANCEMENT #1)
+        home_rest = r.get("home_rest_days", None) if "home_rest_days" in r else None
+        away_rest = r.get("away_rest_days", None) if "away_rest_days" in r else None
+
         mp = {}
         if lg in params:
-            mp = dc_price_match(params[lg], ht, at, max_goals=max_goals)
+            mp = dc_price_match(params[lg], ht, at, max_goals=max_goals,
+                               home_rest_days=home_rest, away_rest_days=away_rest)
         if target == "y_BTTS":
             vec = [mp.get("DC_BTTS_N",0.0), mp.get("DC_BTTS_Y",0.0)]
         elif target.startswith("y_OU_"):
