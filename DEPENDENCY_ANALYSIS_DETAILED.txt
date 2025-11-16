@@ -1,0 +1,507 @@
+================================================================================
+COMPLETE IMPORT DEPENDENCY ANALYSIS FOR run_weekly.py
+================================================================================
+
+Project Directory:
+c:\Users\Chris\OneDrive\My Documents\NewOnedrive\OneDrive\Desktop\football_prediction_clean\football_prediction_clean
+
+Analysis Date: 2025-11-03
+Analysis Scope: All Python imports starting from run_weekly.py
+
+================================================================================
+SECTION 1: FILES THAT ARE IMPORTED/USED (27 FILES)
+================================================================================
+
+LEVEL 1 - DIRECTLY IMPORTED FROM run_weekly.py (17 files)
+────────────────────────────────────────────────────────
+
+1. config.py
+   - Line in run_weekly.py: 11
+   - Imports: from config import OUTPUT_DIR
+   - Also: log_header (line 175)
+   - Purpose: Configuration management, output directory paths
+   - Size: ~92 lines
+   - External Dependencies: pathlib, os, datetime, Path
+
+2. simple_fixture_downloader.py
+   - Line in run_weekly.py: 47
+   - Imports: from simple_fixture_downloader import download_upcoming_fixtures
+   - Purpose: Download upcoming fixtures from football-data.co.uk (Step 0)
+   - Size: ~105 lines
+   - External Dependencies: requests, pandas, pathlib, datetime
+
+3. download_football_data.py
+   - Line in run_weekly.py: 176
+   - Imports: from download_football_data import download
+   - Purpose: Download historical football data by league/season (Step 1)
+   - Size: ~60 lines
+   - Internal Dependencies: config, progress_utils
+   - External Dependencies: requests, pathlib, typing
+
+4. ingest_local_run.py
+   - Line in run_weekly.py: 177
+   - Imports: from ingest_local_run import ingest_local_csvs
+   - Purpose: Validate local CSV data (Step 3)
+   - Size: ~43 lines
+   - Internal Dependencies: config, progress_utils
+   - External Dependencies: pandas, pathlib
+
+5. data_ingest.py
+   - Line in run_weekly.py: 178
+   - Imports: from data_ingest import build_historical_results
+   - Purpose: Build historical results database from downloaded data (Step 2)
+   - Size: ~100 lines
+   - Internal Dependencies: config
+   - External Dependencies: pandas, requests, pathlib, numpy, typing, io, time
+
+6. features.py
+   - Line in run_weekly.py: 179
+   - Imports: from features import build_features
+   - Purpose: Build statistical features for modeling (Step 5)
+   - Size: ~200+ lines
+   - Internal Dependencies: config
+   - External Dependencies: pandas, numpy, pathlib, dataclasses, typing
+
+7. prep_fixtures.py
+   - Line in run_weekly.py: 180
+   - Imports: from prep_fixtures import xlsx_to_csv
+   - Purpose: Convert Excel fixtures to CSV format (Step 7)
+   - Size: ~29 lines
+   - Internal Dependencies: config, progress_utils
+   - External Dependencies: pandas, pathlib, openpyxl
+
+8. predict.py
+   - Line in run_weekly.py: 181
+   - Imports: from predict import predict_week
+   - Purpose: Generate predictions for upcoming fixtures (Step 8)
+   - Size: ~300+ lines
+   - Internal Dependencies: config, models, dc_predict, progress_utils, blending
+   - External Dependencies: pandas, numpy, pathlib, scipy, datetime, json, typing
+
+9. generate_and_load_stats.py
+   - Line in run_weekly.py: 205
+   - Imports: from generate_and_load_stats import generate_statistics
+   - Purpose: Generate team and referee statistics (Step 4)
+   - Size: ~150+ lines
+   - Internal Dependencies: None
+   - External Dependencies: pandas, numpy, pathlib, typing
+
+10. incremental_trainer.py
+    - Line in run_weekly.py: 219
+    - Imports: from incremental_trainer import smart_train_or_load
+    - Purpose: Train models if needed, load existing models (Step 6)
+    - Size: ~100+ lines
+    - Internal Dependencies: models, config
+    - External Dependencies: os, json, pandas, pathlib, datetime
+
+11. btts_ou_optimizer.py
+    - Line in run_weekly.py: 245
+    - Imports: from btts_ou_optimizer import optimize_weekly_predictions
+    - Purpose: Optimize BTTS and Over/Under predictions (Step 9)
+    - Size: ~150+ lines
+    - Internal Dependencies: None
+    - External Dependencies: pandas, numpy, pathlib, typing, sqlite3, datetime
+
+12. ensemble_blender.py
+    - Line in run_weekly.py: 269
+    - Imports: from ensemble_blender import create_superblend_predictions
+    - Purpose: Smart ensemble blending of model predictions (Step 10)
+    - Size: ~200+ lines
+    - Internal Dependencies: None
+    - External Dependencies: pandas, numpy, pathlib, typing, sqlite3, datetime, scipy
+
+13. accuracy_tracker.py
+    - Line in run_weekly.py: 289 (log_weekly_predictions), 392 (update_accuracy_database)
+    - Imports: from accuracy_tracker import log_weekly_predictions, update_accuracy_database
+    - Purpose: Log predictions and track accuracy over time (Steps 11, 16)
+    - Size: ~200+ lines
+    - Internal Dependencies: None
+    - External Dependencies: pandas, sqlite3, pathlib, datetime, typing, json
+
+14. weighted_top50.py
+    - Line in run_weekly.py: 303
+    - Imports: from weighted_top50 import generate_weighted_top50
+    - Purpose: Generate weighted Top 50 predictions (Step 12)
+    - Size: ~150+ lines
+    - Internal Dependencies: None
+    - External Dependencies: pandas, sqlite3, pathlib, typing, json
+
+15. ou_analyzer.py
+    - Line in run_weekly.py: 316
+    - Imports: from ou_analyzer import analyze_ou_predictions
+    - Purpose: Over/Under market analysis (Step 13)
+    - Size: ~200+ lines
+    - Internal Dependencies: config
+    - External Dependencies: pandas, numpy, pathlib, datetime, sqlite3
+
+16. accumulator_finder.py
+    - Line in run_weekly.py: 336
+    - Imports: from accumulator_finder import AccumulatorFinder
+    - Purpose: Build accumulator betting combinations (Step 14)
+    - Size: ~200+ lines
+    - Internal Dependencies: None
+    - External Dependencies: pandas, numpy, pathlib, itertools, typing
+
+17. bet_finder_all_markets.py
+    - Line in run_weekly.py: 367
+    - Imports: from bet_finder_all_markets import BetFinder
+    - Purpose: Find quality bets across all markets (Step 15)
+    - Size: ~300+ lines
+    - Internal Dependencies: None
+    - External Dependencies: pandas, numpy, pathlib, datetime
+
+LEVEL 2 - INDIRECTLY IMPORTED (via Level 1 modules) (7 files)
+─────────────────────────────────────────────────────────
+
+18. progress_utils.py
+    - Referenced By: download_football_data.py, ingest_local_run.py, prep_fixtures.py, predict.py, models.py
+    - Imports From These Files:
+      * download_football_data.py line 7: from progress_utils import Timer, heartbeat
+      * ingest_local_run.py line 6: from progress_utils import Timer
+      * prep_fixtures.py line 5: from progress_utils import Timer
+      * predict.py line 25: from progress_utils import heartbeat
+      * models.py line 67: from progress_utils import Timer, heartbeat
+    - Purpose: Utility functions for timing and progress tracking
+    - Size: ~11 lines (very compact)
+    - External Dependencies: sys, time, datetime
+
+19. models.py
+    - Referenced By: predict.py, incremental_trainer.py
+    - Imports From These Files:
+      * predict.py line 23: from models import load_trained_targets, predict_proba as model_predict
+      * incremental_trainer.py line 9: from models import train_all_targets, load_trained_targets, _load_features
+    - Purpose: Core machine learning model training and prediction
+    - Size: ~200+ lines
+    - Internal Dependencies: model_binary, model_multiclass, model_ordinal, models_dc, tuning, ordinal, calibration
+    - External Dependencies: numpy, pandas, optuna, sklearn (multiple), joblib, config, progress_utils
+
+20. dc_predict.py
+    - Referenced By: predict.py
+    - Imports From predict.py line 24: from dc_predict import build_dc_for_fixtures
+    - Purpose: Build Dixon-Coles model predictions
+    - Size: ~30 lines
+    - Internal Dependencies: models_dc
+    - External Dependencies: pandas, pathlib, config
+
+21. blending.py
+    - Referenced By: predict.py
+    - Imports From predict.py line 26: from blending import BLEND_WEIGHTS_JSON
+    - Purpose: Blend predictions from multiple models
+    - Size: ~200+ lines
+    - Internal Dependencies: models_dc, models
+    - External Dependencies: pandas, numpy, pathlib, json, typing, dataclasses
+
+LEVEL 3 - INDIRECTLY IMPORTED (via Level 2 modules) (3 files)
+──────────────────────────────────────────────────────────
+
+22. model_binary.py
+    - Referenced By: models.py
+    - Imports From models.py line 27: from model_binary import BinaryMarketModel, is_binary_market
+    - Purpose: Binary classification models for BTTS, O/U markets
+    - Size: ~150+ lines
+    - External Dependencies: numpy, pandas, sklearn
+
+23. model_multiclass.py
+    - Referenced By: models.py
+    - Imports From models.py line 28: from model_multiclass import MulticlassMarketModel, is_multiclass_market
+    - Purpose: Multiclass models for 1X2, Half-time, HT/FT markets
+    - Size: ~150+ lines
+    - External Dependencies: numpy, pandas, sklearn
+
+24. model_ordinal.py
+    - Referenced By: models.py
+    - Imports From models.py line 29: from model_ordinal import OrdinalMarketModel, is_ordinal_market
+    - Purpose: Ordinal classification for goal ranges, correct scores
+    - Size: ~150+ lines
+    - External Dependencies: numpy, pandas, sklearn
+
+LEVEL 3 CONTINUED (shared dependencies)
+─────────────────────────────────────────
+
+25. models_dc.py
+    - Referenced By: models.py (line 71), blending.py (line 10), dc_predict.py (line 6)
+    - Purpose: Dixon-Coles statistical model for football predictions
+    - Size: ~200+ lines
+    - External Dependencies: numpy, pandas, scipy, dataclasses, typing
+
+26. tuning.py
+    - Referenced By: models.py
+    - Imports From models.py line 68: from tuning import make_time_split, objective_factory, CVData
+    - Purpose: Hyperparameter tuning with cross-validation
+    - Size: ~150+ lines
+    - External Dependencies: numpy, sklearn, optuna, warnings, dataclasses, typing
+
+27. ordinal.py
+    - Referenced By: models.py
+    - Imports From models.py line 69: from ordinal import CORALOrdinal
+    - Purpose: CORAL ordinal classification
+    - Size: ~48 lines
+    - External Dependencies: numpy, sklearn
+
+28. calibration.py
+    - Referenced By: models.py
+    - Imports From models.py line 70: from calibration import DirichletCalibrator, TemperatureScaler
+    - Purpose: Probability calibration (temperature scaling, Dirichlet)
+    - Size: ~44 lines
+    - External Dependencies: numpy, sklearn
+
+
+================================================================================
+SECTION 2: FILES THAT ARE NOT IMPORTED/USED (25 FILES)
+================================================================================
+
+These files exist in the project but are never referenced by run_weekly.py or any
+of its imported dependencies. They may be:
+- Old/backup versions
+- Experimental code
+- Alternative implementations
+- Unused utility scripts
+
+CATEGORY 1: OLD/BACKUP MODEL FILES (4 files)
+──────────────────────────────────────────
+
+1. modelsOLD.py - Old model implementation (deprecated)
+2. model_binaryMAIN.py - Alternative binary model (not used)
+3. model_multiclassMAIN.py - Alternative multiclass model (not used)
+4. model_ordinalMAIN.py - Alternative ordinal model (not used)
+
+Note: The active versions are model_binary.py, model_multiclass.py, model_ordinal.py
+      which are imported by models.py
+
+CATEGORY 2: BACKTESTING/ANALYSIS MODULES (8 files)
+────────────────────────────────────────────
+
+1. backtest.py - Main backtesting system
+2. backtest_engine.py - Backtesting engine implementation
+3. backtest_config.py - Backtesting configuration
+4. backtest_error_handling.py - Error handling for backtest
+5. backtest_visualizer.py - Visualization for backtest results
+6. realistic_backtest.py - Realistic backtesting simulation
+7. train_evaluate.py - Training and evaluation utilities
+8. update_results.py - Update actual match results (called separately, not in weekly run)
+
+Note: These are separate from the weekly pipeline and are likely used in
+      post-match analysis or experimental backtesting workflows.
+
+CATEGORY 3: ALTERNATIVE FIXTURE DOWNLOADERS (4 files)
+──────────────────────────────────────────────────
+
+1. auto_fixture_downloader.py - Automatic download (alternative to simple_fixture_downloader.py)
+2. api_football_weekly_fixtures.py - Uses API Football API (alternative implementation)
+3. combined_fixture_downloader.py - Combined approach (alternative implementation)
+4. cup_fixtures_addon_FINAL.py - Adds cup fixtures (alternative addon)
+
+Note: The weekly pipeline uses simple_fixture_downloader.py instead
+
+CATEGORY 4: ALTERNATIVE/EXPERIMENTAL MODULES (4 files)
+───────────────────────────────────────────────────
+
+1. enhanced_predict.py - Enhanced prediction (alternative to predict.py)
+2. acc_builder.py - Accumulator builder (alternative to accumulator_finder.py)
+3. email_sender.py - Email notification system (implemented but not integrated)
+4. load_existing_stats.py - Load stats utility (alternative to generate_and_load_stats.py)
+
+CATEGORY 5: OTHER (5 files)
+──────────
+
+1. setup_structure.py - Project structure setup (one-time setup utility)
+2. model_enhancer.py - Model enhancement utility (not integrated)
+3. calibration.py - USED - See Level 3
+4. ordinal.py - USED - See Level 3
+5. dc_predict.py - USED - See Level 2
+6. blending.py - USED - See Level 2
+7. models_dc.py - USED - See Level 3
+8. tuning.py - USED - See Level 3
+9. updated_run_weekly (1).py - Duplicate backup of main script
+
+Note: Some of these appeared in my initial scan but are actually USED in the import chain.
+      Only files in "CATEGORY 1-5" are truly unused.
+
+
+================================================================================
+SECTION 3: IMPORT CHAIN VISUALIZATION
+================================================================================
+
+COMPLETE IMPORT TREE (showing all paths):
+
+run_weekly.py (START)
+│
+├─ STEP 0 (Download Fixtures)
+│  └─ simple_fixture_downloader.py
+│
+├─ STEP 1 (Download Historical Data)
+│  └─ download_football_data.py
+│     └─ progress_utils.py
+│
+├─ STEP 2 (Build Database)
+│  └─ data_ingest.py
+│
+├─ STEP 3 (Validate Local Data)
+│  └─ ingest_local_run.py
+│     └─ progress_utils.py
+│
+├─ STEP 4 (Generate Statistics)
+│  └─ generate_and_load_stats.py
+│
+├─ STEP 5 (Build Features)
+│  └─ features.py
+│
+├─ STEP 6 (Train/Load Models) ★ COMPLEX
+│  └─ incremental_trainer.py
+│     └─ models.py ★ HUB MODULE
+│        ├─ model_binary.py
+│        ├─ model_multiclass.py
+│        ├─ model_ordinal.py
+│        │  └─ ordinal.py
+│        ├─ models_dc.py
+│        ├─ tuning.py
+│        ├─ calibration.py
+│        └─ progress_utils.py
+│
+├─ STEP 7 (Prepare Fixtures)
+│  └─ prep_fixtures.py
+│     └─ progress_utils.py
+│
+├─ STEP 8 (Generate Predictions) ★ COMPLEX
+│  └─ predict.py ★ HUB MODULE
+│     ├─ models.py (SHARED with Step 6)
+│     │  └─ [see Step 6 dependencies]
+│     ├─ dc_predict.py
+│     │  └─ models_dc.py (SHARED)
+│     ├─ progress_utils.py (SHARED)
+│     └─ blending.py
+│        ├─ models.py (SHARED with Step 6)
+│        └─ models_dc.py (SHARED)
+│
+├─ STEP 9 (Optimize BTTS/O/U)
+│  └─ btts_ou_optimizer.py
+│
+├─ STEP 10 (Smart Ensemble Blending)
+│  └─ ensemble_blender.py
+│
+├─ STEP 11 (Log Predictions)
+│  └─ accuracy_tracker.py
+│
+├─ STEP 12 (Generate Weighted Top 50)
+│  └─ weighted_top50.py
+│
+├─ STEP 13 (O/U Analysis)
+│  └─ ou_analyzer.py
+│
+├─ STEP 14 (Build Accumulators)
+│  └─ accumulator_finder.py
+│
+├─ STEP 15 (Find Quality Bets)
+│  └─ bet_finder_all_markets.py
+│
+└─ STEP 16 (Update Accuracy Database)
+   └─ accuracy_tracker.py (SHARED with Step 11)
+
+
+================================================================================
+SECTION 4: DEPENDENCY STATISTICS
+================================================================================
+
+File Counts:
+  Total Python files in project: 52
+  Files used by run_weekly.py: 27 (52%)
+  Files unused: 25 (48%)
+
+Import Depth:
+  Maximum chain depth: 4 levels
+  Direct imports (Level 1): 17 files
+  Indirect imports (Levels 2-3): 10 files
+
+Hub Modules (files with multiple incoming references):
+  1. models.py - Referenced by: predict.py, incremental_trainer.py, blending.py (3)
+  2. models_dc.py - Referenced by: models.py, blending.py, dc_predict.py (3)
+  3. progress_utils.py - Referenced by: download_football_data.py, ingest_local_run.py,
+                         prep_fixtures.py, predict.py, models.py (5)
+  4. accuracy_tracker.py - Referenced by: run_weekly.py (2 separate functions)
+  5. config.py - Referenced by: ~15 files
+
+Most Complex Dependencies:
+  1. predict.py - depends on models.py, dc_predict.py, blending.py (which themselves depend on multiple modules)
+  2. models.py - depends on 5+ sub-modules (model_binary, model_multiclass, model_ordinal, models_dc, tuning, ordinal, calibration)
+  3. blending.py - depends on models.py and models_dc.py
+
+External Library Dependencies:
+  Core: pandas, numpy, sklearn, scipy
+  Data: requests, openpyxl (for Excel)
+  ML: optuna (hyperparameter tuning), joblib (model serialization)
+  Database: sqlite3 (accuracy tracking)
+  Utilities: pathlib, os, datetime, json, typing, dataclasses, itertools
+
+Critical Files (if removed, pipeline breaks):
+  - config.py (configuration)
+  - models.py (ML core)
+  - predict.py (prediction generation)
+  - features.py (feature engineering)
+  - download_football_data.py (data acquisition)
+  - data_ingest.py (data processing)
+
+
+================================================================================
+SECTION 5: IMPORT ANOMALIES & NOTES
+================================================================================
+
+1. CIRCULAR DEPENDENCY CHECK:
+   ✓ No circular dependencies detected
+   ✓ Import graph is a valid DAG (Directed Acyclic Graph)
+
+2. DUPLICATE FUNCTIONALITY:
+   ✗ model_binaryMAIN.py, model_multiclassMAIN.py, model_ordinalMAIN.py exist
+     but are not imported (use model_binary.py, model_multiclass.py, model_ordinal.py instead)
+   ✗ Multiple downloader implementations (simple_fixture_downloader.py used,
+     others like auto_fixture_downloader.py unused)
+   ✗ Multiple backtesting modules not integrated into main pipeline
+
+3. UNUSED BUT POTENTIALLY USEFUL:
+   ✓ email_sender.py - Implemented but never called (could be integrated for notifications)
+   ✓ update_results.py - Separate script for post-match updates (called outside main pipeline)
+
+4. FILE ORGANIZATION ISSUES:
+   - Old versions mixed with new versions (modelsOLD.py, model_*MAIN.py)
+   - Backtesting code not clearly separated (backtest*.py in root directory)
+   - Alternative implementations not archived (alternative downloaders, predictors)
+
+5. IMPORT STYLE:
+   - Consistent use of absolute imports (from module import item)
+   - Good practice of importing config centrally
+   - Some dynamic imports in try/except blocks (optional dependencies like optuna, xgboost)
+
+
+================================================================================
+SECTION 6: RECOMMENDATIONS
+================================================================================
+
+CLEANUP SUGGESTIONS:
+
+1. Archive or delete unused files:
+   - modelsOLD.py
+   - model_binaryMAIN.py, model_multiclassMAIN.py, model_ordinalMAIN.py
+   - backtest*.py (if no longer maintained)
+   - auto_fixture_downloader.py, api_football_weekly_fixtures.py, combined_fixture_downloader.py
+   - cup_fixtures_addon_FINAL.py
+   - enhanced_predict.py, acc_builder.py, load_existing_stats.py
+   - updated_run_weekly (1).py
+
+2. Integration opportunities:
+   - Integrate email_sender.py into run_weekly.py for completion notifications
+   - Consider integrating update_results.py into a post-match workflow
+   - Document the backtesting workflow if it's actively maintained
+
+3. Dependency documentation:
+   - Create requirements.txt with all external dependencies
+   - Document optional dependencies (optuna, xgboost, lightgbm, catboost)
+   - Add installation instructions
+
+4. Code organization:
+   - Move backtesting to separate /backtesting directory
+   - Move alternative implementations to /experimental directory
+   - Keep only active implementations in root
+
+
+================================================================================
+END OF ANALYSIS
+================================================================================

@@ -1,0 +1,285 @@
+================================================================================
+QUICK REFERENCE: FILES IMPORTED BY run_weekly.py
+================================================================================
+
+SUMMARY STATISTICS
+───────────────────
+Total Files in Project:        52
+Files USED:                    27 (52%)
+Files UNUSED:                  25 (48%)
+Direct Imports (Level 1):      17
+Indirect Imports (Level 2-3):  10
+
+================================================================================
+FILES USED (27) - QUICK LIST
+================================================================================
+
+LEVEL 1 - DIRECTLY IMPORTED (17 files)
+──────────────────────────────────────
+ ✓ config.py                         - Configuration & paths
+ ✓ simple_fixture_downloader.py      - Download upcoming fixtures
+ ✓ download_football_data.py         - Download historical data
+ ✓ ingest_local_run.py               - Validate CSV data
+ ✓ data_ingest.py                    - Build database
+ ✓ features.py                       - Feature engineering
+ ✓ prep_fixtures.py                  - Convert fixtures XLSX→CSV
+ ✓ predict.py                        - Generate predictions
+ ✓ generate_and_load_stats.py        - Generate team statistics
+ ✓ incremental_trainer.py            - Train/load models
+ ✓ btts_ou_optimizer.py              - Optimize BTTS/OU
+ ✓ ensemble_blender.py               - Blend predictions
+ ✓ accuracy_tracker.py               - Track prediction accuracy
+ ✓ weighted_top50.py                 - Generate Top 50
+ ✓ ou_analyzer.py                    - Over/Under analysis
+ ✓ accumulator_finder.py             - Build accumulators
+ ✓ bet_finder_all_markets.py         - Find quality bets
+
+LEVEL 2 - IMPORTED BY LEVEL 1 (4 files)
+─────────────────────────────────────
+ ✓ models.py                         - ML model training/prediction
+ ✓ dc_predict.py                     - Dixon-Coles predictions
+ ✓ blending.py                       - Blend model outputs
+ ✓ progress_utils.py                 - Timing/logging utilities
+
+LEVEL 3 - IMPORTED BY LEVEL 2 (6 files)
+──────────────────────────────────────
+ ✓ model_binary.py                   - Binary classification
+ ✓ model_multiclass.py               - Multi-class classification
+ ✓ model_ordinal.py                  - Ordinal classification
+ ✓ models_dc.py                      - Dixon-Coles model
+ ✓ tuning.py                         - Hyperparameter tuning
+ ✓ ordinal.py                        - CORAL ordinal classifier
+ ✓ calibration.py                    - Probability calibration
+
+================================================================================
+FILES UNUSED (25) - QUICK LIST
+================================================================================
+
+CATEGORY: OLD/BACKUP MODEL FILES (4)
+─────────────────────────────────────
+ ✗ modelsOLD.py                      - Deprecated model version
+ ✗ model_binaryMAIN.py               - Alternative binary model
+ ✗ model_multiclassMAIN.py           - Alternative multiclass model
+ ✗ model_ordinalMAIN.py              - Alternative ordinal model
+
+CATEGORY: BACKTESTING MODULES (8)
+──────────────────────────────────
+ ✗ backtest.py                       - Backtesting system
+ ✗ backtest_engine.py                - Backtest engine
+ ✗ backtest_config.py                - Backtest configuration
+ ✗ backtest_error_handling.py        - Backtest error handling
+ ✗ backtest_visualizer.py            - Backtest visualization
+ ✗ realistic_backtest.py             - Realistic backtest
+ ✗ train_evaluate.py                 - Training/evaluation utilities
+ ✗ update_results.py                 - Update match results (separate script)
+
+CATEGORY: ALTERNATIVE DOWNLOADERS (4)
+──────────────────────────────────────
+ ✗ auto_fixture_downloader.py        - Auto download (alternative)
+ ✗ api_football_weekly_fixtures.py   - API Football variant
+ ✗ combined_fixture_downloader.py    - Combined approach variant
+ ✗ cup_fixtures_addon_FINAL.py       - Cup fixtures addon
+
+CATEGORY: ALTERNATIVE/EXPERIMENTAL (4)
+───────────────────────────────────────
+ ✗ enhanced_predict.py               - Enhanced predictions (unused)
+ ✗ acc_builder.py                    - Accumulator builder variant
+ ✗ email_sender.py                   - Email notifications (not integrated)
+ ✗ load_existing_stats.py            - Load stats variant
+
+CATEGORY: MISC (1)
+───────────────────
+ ✗ setup_structure.py                - One-time setup utility
+ ✗ updated_run_weekly (1).py         - Backup/duplicate of main script
+
+================================================================================
+CRITICAL FILES (CANNOT REMOVE)
+================================================================================
+
+These files are ESSENTIAL for run_weekly.py to function:
+
+ 1. config.py                    - All configuration & paths
+ 2. models.py                    - Core ML engine
+ 3. predict.py                   - Main prediction generation
+ 4. download_football_data.py    - Data acquisition
+ 5. data_ingest.py              - Data processing
+ 6. features.py                 - Feature engineering
+
+If any of these are missing or broken, the pipeline will fail.
+
+================================================================================
+SAFE FILES TO DELETE/ARCHIVE
+================================================================================
+
+These files can be safely removed without affecting the pipeline:
+
+Group 1 - Old/Duplicate Models (DELETE OR ARCHIVE):
+    - modelsOLD.py
+    - model_binaryMAIN.py
+    - model_multiclassMAIN.py
+    - model_ordinalMAIN.py
+    Reason: Replaced by model_binary.py, model_multiclass.py, model_ordinal.py
+
+Group 2 - Alternative Downloaders (DELETE OR ARCHIVE):
+    - auto_fixture_downloader.py
+    - api_football_weekly_fixtures.py
+    - combined_fixture_downloader.py
+    - cup_fixtures_addon_FINAL.py
+    Reason: Replaced by simple_fixture_downloader.py
+
+Group 3 - Backtesting (ARCHIVE IF NEEDED):
+    - backtest.py
+    - backtest_engine.py
+    - backtest_config.py
+    - backtest_error_handling.py
+    - backtest_visualizer.py
+    - realistic_backtest.py
+    - train_evaluate.py
+    Reason: Separate from main weekly pipeline
+
+Group 4 - Unused Alternatives (DELETE):
+    - enhanced_predict.py
+    - acc_builder.py
+    - load_existing_stats.py
+    Reason: Replaced by predict.py, accumulator_finder.py, generate_and_load_stats.py
+
+Group 5 - Misc (DELETE):
+    - setup_structure.py
+    - updated_run_weekly (1).py
+    Reason: One-time setup or backup files
+
+POTENTIAL INTEGRATION:
+    - email_sender.py (could be integrated for email notifications)
+    - update_results.py (separate post-match workflow, keep as standalone)
+
+Total Safe to Delete: 21 files (~40% of codebase)
+
+================================================================================
+IMPORT CHAIN MAP (VISUAL)
+================================================================================
+
+run_weekly.py
+│
+├─ STEP 1: Download Data
+│  ├─ download_football_data.py
+│  │  └─ progress_utils.py
+│  ├─ data_ingest.py
+│  └─ ingest_local_run.py
+│
+├─ STEP 2: Features
+│  └─ features.py
+│
+├─ STEP 3: Train Models
+│  └─ incremental_trainer.py
+│     └─ models.py (HUB)
+│        ├─ model_binary.py
+│        ├─ model_multiclass.py
+│        ├─ model_ordinal.py
+│        │  └─ ordinal.py
+│        ├─ models_dc.py
+│        ├─ tuning.py
+│        ├─ calibration.py
+│        └─ progress_utils.py
+│
+├─ STEP 4: Make Predictions
+│  └─ predict.py (HUB)
+│     ├─ models.py (shared)
+│     ├─ dc_predict.py
+│     │  └─ models_dc.py (shared)
+│     ├─ blending.py
+│     │  ├─ models.py (shared)
+│     │  └─ models_dc.py (shared)
+│     └─ progress_utils.py
+│
+└─ STEPS 5-16: Analysis & Reporting
+   ├─ btts_ou_optimizer.py
+   ├─ ensemble_blender.py
+   ├─ accuracy_tracker.py
+   ├─ weighted_top50.py
+   ├─ ou_analyzer.py
+   ├─ accumulator_finder.py
+   └─ bet_finder_all_markets.py
+
+KEY: Files with [HUB] label have multiple incoming references
+
+================================================================================
+EXTERNAL DEPENDENCIES (Third-Party Libraries)
+================================================================================
+
+CORE MACHINE LEARNING:
+    - sklearn (scikit-learn)
+    - numpy
+    - pandas
+    - scipy
+    - optuna (hyperparameter tuning, optional)
+
+OPTIONAL ML LIBRARIES (disable via env vars):
+    - xgboost
+    - lightgbm
+    - catboost
+    - torch (PyTorch)
+
+DATA HANDLING:
+    - requests (HTTP downloads)
+    - openpyxl (Excel files)
+
+UTILITIES:
+    - joblib (model serialization)
+    - pathlib (path handling)
+    - sqlite3 (database - built-in)
+    - json (data format - built-in)
+    - datetime (time handling - built-in)
+    - os (file operations - built-in)
+
+================================================================================
+CONFIGURATION & ENVIRONMENT
+================================================================================
+
+Environment Variables Used (set in run_weekly.py):
+    - DISABLE_XGB=1              (disable XGBoost)
+    - OPTUNA_TRIALS=5            (hyperparameter tuning)
+    - N_ESTIMATORS=150           (number of trees)
+    - EMAIL_SMTP_SERVER=...      (email config)
+    - EMAIL_SMTP_PORT=...        (email config)
+    - EMAIL_SENDER=...           (email config)
+    - EMAIL_PASSWORD=...         (email config)
+    - EMAIL_RECIPIENT=...        (email config)
+
+Configuration File:
+    - config.py sets PROJECT CONSTANTS:
+      * BASE_DIR, DATA_DIR, OUTPUT_DIR paths
+      * FEATURES_PARQUET, HISTORICAL_PARQUET
+      * LEAGUE_CODES, SEASONS
+      * API keys and URLs
+
+================================================================================
+RUNNING THE PIPELINE
+================================================================================
+
+Main Entry Point:
+    python run_weekly.py
+
+This executes 17 steps:
+    1. Download historical data
+    2. Build database
+    3. Validate local data
+    4. Generate statistics
+    5. Build features
+    6. Train/load models
+    7. Prepare fixtures
+    8. Generate predictions
+    9. Optimize BTTS/O/U
+    10. Smart ensemble blending
+    11. Log predictions
+    12. Generate weighted Top 50
+    13. O/U analysis
+    14. Build accumulators
+    15. Find quality bets
+    16. Update accuracy database
+    17. Archive outputs
+
+Each step uses one or more of the 27 imported files listed above.
+
+================================================================================
+EOF - END OF QUICK REFERENCE
+================================================================================
