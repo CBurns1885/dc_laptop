@@ -36,6 +36,47 @@ DEFAULT_DECAY = 400.0
 MAX_GOALS = 12  # Increased for better tail accuracy
 RECENT_FORM_WINDOW = 5  # Last 5 matches for form boost
 
+# ENHANCEMENT #3: Seasonal goal patterns (early/mid/late season adjustments)
+LEAGUE_SEASONAL_PATTERNS = {
+    'E0': {  # Premier League (38 games)
+        'early': (0, 10, 1.08),    # Matches 1-10: +8% goals (teams still gelling)
+        'mid': (11, 28, 1.00),     # Matches 11-28: baseline
+        'late': (29, 38, 0.95),    # Matches 29-38: -5% goals (fatigue, defensive)
+    },
+    'E1': {  # Championship (46 games)
+        'early': (0, 12, 1.10),    # Even more goals early (lower quality defences)
+        'mid': (13, 36, 1.00),
+        'late': (37, 46, 0.92),    # More fatigue due to longer season
+    },
+    'D1': {  # Bundesliga (34 games)
+        'early': (0, 9, 1.12),     # Bundesliga famous for high-scoring starts
+        'mid': (10, 26, 1.00),
+        'late': (27, 34, 0.94),    # Winter break effect wears off
+    },
+    'SP1': {  # La Liga (38 games)
+        'early': (0, 10, 1.05),    # Moderate early bump
+        'mid': (11, 28, 1.00),
+        'late': (29, 38, 0.96),    # Tight title races = cagey games
+    },
+    'I1': {  # Serie A (38 games)
+        'early': (0, 10, 1.06),
+        'mid': (11, 28, 1.00),
+        'late': (29, 38, 0.93),    # Most defensive late season
+    },
+    'F1': {  # Ligue 1 (38 games)
+        'early': (0, 10, 1.07),
+        'mid': (11, 28, 1.00),
+        'late': (29, 38, 0.95),
+    },
+}
+
+# Default seasonal pattern for leagues not specified above
+DEFAULT_SEASONAL_PATTERN = {
+    'early': (0, 8, 1.06),
+    'mid': (9, 30, 1.00),
+    'late': (31, 46, 0.96),
+}
+
 # ============================================================================
 # DATA STRUCTURES
 # ============================================================================
@@ -48,16 +89,45 @@ class DCParams:
     home_adv: float
     rho: float
     league: str
-    
+
     # NEW: Recent form multipliers
     recent_attack: Dict[str, float] = None
     recent_defence: Dict[str, float] = None
-    
+
     def __post_init__(self):
         if self.recent_attack is None:
             self.recent_attack = {}
         if self.recent_defence is None:
             self.recent_defence = {}
+
+# ============================================================================
+# ENHANCEMENT #3: Seasonal Adjustment Helper
+# ============================================================================
+
+def _get_seasonal_multiplier(league: str, match_number: Optional[int] = None) -> float:
+    """
+    Get seasonal goal adjustment multiplier based on match number in season.
+
+    Args:
+        league: League code (e.g., 'E0', 'D1')
+        match_number: Which match in the season (0-indexed, so match 0 = first match)
+
+    Returns:
+        Multiplier to apply to expected goals (e.g., 1.08 = +8% goals)
+    """
+    if match_number is None:
+        return 1.0  # No adjustment if match number unknown
+
+    # Get league-specific pattern or default
+    pattern = LEAGUE_SEASONAL_PATTERNS.get(league, DEFAULT_SEASONAL_PATTERN)
+
+    # Determine which phase we're in
+    for phase_name, (start, end, multiplier) in pattern.items():
+        if start <= match_number <= end:
+            return multiplier
+
+    # If beyond all phases (shouldn't happen), use late season multiplier
+    return pattern['late'][2]
 
 # ============================================================================
 # TIME WEIGHTING (ADAPTIVE)
@@ -323,7 +393,8 @@ def price_match(params: DCParams, home: str, away: str,
                 use_form: bool = True,
                 max_goals: int = MAX_GOALS,
                 home_rest_days: Optional[int] = None,
-                away_rest_days: Optional[int] = None) -> Dict[str, float]:
+                away_rest_days: Optional[int] = None,
+                match_number: Optional[int] = None) -> Dict[str, float]:
     """
     Calculate probabilities for all markets with form adjustment
 
@@ -335,6 +406,7 @@ def price_match(params: DCParams, home: str, away: str,
         max_goals: Maximum goals for calculations
         home_rest_days: Days since home team's last match (for fixture congestion adjustment)
         away_rest_days: Days since away team's last match (for fixture congestion adjustment)
+        match_number: Which match in the season (0-indexed) for seasonal adjustment
 
     Returns:
         Dictionary of market probabilities
@@ -372,7 +444,14 @@ def price_match(params: DCParams, home: str, away: str,
             mu *= 0.88  # 12% reduction for short rest
         elif away_rest_days < 7:
             mu *= 0.95  # 5% reduction for medium rest
-    
+
+    # ENHANCEMENT #3: Seasonal Pattern Adjustment
+    # Goals vary by season phase (early/mid/late)
+    seasonal_mult = _get_seasonal_multiplier(params.league, match_number)
+    if seasonal_mult != 1.0:
+        lam *= seasonal_mult
+        mu *= seasonal_mult
+
     # Generate score probability grid
     P = _score_grid(lam, mu, params.rho, max_goals)
     

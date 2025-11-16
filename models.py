@@ -418,12 +418,14 @@ def _dc_probs_for_rows(train_df: pd.DataFrame, rows_df: pd.DataFrame, target: st
     params = dc_fit_all(train_df[["League","Date","HomeTeam","AwayTeam","FTHG","FTAG"]])
     out = []
 
-    # Prepare column list - include rest days if available
+    # Prepare column list - include rest days and match_number if available
     cols = ["League","HomeTeam","AwayTeam"]
     if "home_rest_days" in rows_df.columns:
         cols.append("home_rest_days")
     if "away_rest_days" in rows_df.columns:
         cols.append("away_rest_days")
+    if "match_number" in rows_df.columns:
+        cols.append("match_number")
 
     for _, r in rows_df[cols].iterrows():
         lg, ht, at = r["League"], r["HomeTeam"], r["AwayTeam"]
@@ -432,10 +434,14 @@ def _dc_probs_for_rows(train_df: pd.DataFrame, rows_df: pd.DataFrame, target: st
         home_rest = r.get("home_rest_days", None) if "home_rest_days" in r else None
         away_rest = r.get("away_rest_days", None) if "away_rest_days" in r else None
 
+        # Extract match number if available (ENHANCEMENT #3)
+        match_num = r.get("match_number", None) if "match_number" in r else None
+
         mp = {}
         if lg in params:
             mp = dc_price_match(params[lg], ht, at, max_goals=max_goals,
-                               home_rest_days=home_rest, away_rest_days=away_rest)
+                               home_rest_days=home_rest, away_rest_days=away_rest,
+                               match_number=match_num)
         if target == "y_BTTS":
             vec = [mp.get("DC_BTTS_N",0.0), mp.get("DC_BTTS_Y",0.0)]
         elif target.startswith("y_OU_"):

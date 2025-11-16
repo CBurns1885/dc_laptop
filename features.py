@@ -306,6 +306,56 @@ def _add_rest_days_feature(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # -----------------------------
+# ENHANCEMENT #3: Match Number Feature
+# -----------------------------
+
+def _add_match_number_feature(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate match number in season for each team (0-indexed).
+
+    This enables seasonal pattern adjustments:
+    - Early season: More goals (teams still gelling defensively)
+    - Mid season: Normal baseline
+    - Late season: Fewer goals (fatigue, tight defensive tactics)
+
+    For a team's perspective, match_number = how many league games they've played this season.
+    For overall match perspective, we take the average of both teams' match numbers.
+    """
+    df = df.sort_values(['League', 'Date']).copy()
+
+    match_numbers = []
+
+    for idx, row in df.iterrows():
+        home_team = row['HomeTeam']
+        away_team = row['AwayTeam']
+        match_date = pd.to_datetime(row['Date'])
+        league = row['League']
+
+        # Count how many matches each team has played this season (same league)
+        home_prev_count = df[(df['Date'] < row['Date']) &
+                             (df['League'] == league) &
+                             ((df['HomeTeam'] == home_team) | (df['AwayTeam'] == home_team))].shape[0]
+
+        away_prev_count = df[(df['Date'] < row['Date']) &
+                             (df['League'] == league) &
+                             ((df['HomeTeam'] == away_team) | (df['AwayTeam'] == away_team))].shape[0]
+
+        # Match number is 0-indexed (0 = first match, 1 = second match, etc.)
+        # Use average of both teams' match numbers
+        avg_match_num = int((home_prev_count + away_prev_count) / 2)
+
+        match_numbers.append(avg_match_num)
+
+    df['match_number'] = match_numbers
+
+    print(f"  ✅ Match numbers calculated - Range: 0 to {df['match_number'].max()}")
+    print(f"  📊 Distribution: Early (0-10): {(df['match_number'] <= 10).sum()}, "
+          f"Mid (11-28): {((df['match_number'] > 10) & (df['match_number'] <= 28)).sum()}, "
+          f"Late (29+): {(df['match_number'] > 28).sum()}")
+
+    return df
+
+# -----------------------------
 # Main build function
 # -----------------------------
 
@@ -349,6 +399,10 @@ def build_features(force: bool = False) -> Path:
     # ENHANCEMENT #1: Rest Days (Fixture Congestion)
     log_header("Calculating rest days (fixture congestion)")
     df = _add_rest_days_feature(df)
+
+    # ENHANCEMENT #3: Match Number (Season Phase)
+    log_header("Calculating match numbers for seasonal patterns")
+    df = _add_match_number_feature(df)
 
     # Targets - DC-ONLY: BTTS and Over/Under (0.5-5.5)
     df["y_BTTS"] = _target_btts(df).astype(str)
