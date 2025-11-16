@@ -368,71 +368,21 @@ def price_match(params: DCParams, home: str, away: str,
     out['DC_BTTS_Y'] = P[1:, 1:].sum()
     out['DC_BTTS_N'] = 1 - out['DC_BTTS_Y']
     
-    # Over/Under lines (CRITICAL FOR O/U ACCURACY)
+    # Over/Under lines (0.5 to 5.5 goal lines only)
     S = np.add.outer(np.arange(P.shape[0]), np.arange(P.shape[1]))
-    
-    for line in [0.5, 1.5, 2.5, 3.5, 4.5]:
+
+    for line in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
         line_str = str(line).replace('.', '_')
-        
+
         over_prob = P[S > line].sum()
         under_prob = P[S < line].sum()
-        
+
         # Handle exactly on line (push in some markets)
         on_line_prob = P[S == line].sum()
-        
+
         # For X.5 lines, no push possible
         out[f'DC_OU_{line_str}_O'] = over_prob
         out[f'DC_OU_{line_str}_U'] = under_prob + on_line_prob
-    
-    # Asian Handicap lines
-    ah_lines = [-1.0, -0.5, 0.0, 0.5, 1.0]
-    for line in ah_lines:
-        if line < 0:
-            line_key = f"-{abs(line)}".replace('.', '_')
-        else:
-            line_key = f"+{line}".replace('.', '_') if line > 0 else "0_0"
-        
-        home_wins = away_wins = pushes = 0.0
-        
-        for h in range(P.shape[0]):
-            for a in range(P.shape[1]):
-                adjusted_diff = h - a - line
-                prob = P[h, a]
-                
-                if adjusted_diff > 0:
-                    home_wins += prob
-                elif adjusted_diff < 0:
-                    away_wins += prob
-                else:
-                    pushes += prob
-        
-        out[f'DC_AH_{line_key}_H'] = home_wins
-        out[f'DC_AH_{line_key}_A'] = away_wins
-        out[f'DC_AH_{line_key}_P'] = pushes
-    
-    # Goal Ranges
-    out['DC_GR_0'] = P[S == 0].sum()
-    out['DC_GR_1'] = P[S == 1].sum()
-    out['DC_GR_2'] = P[S == 2].sum()
-    out['DC_GR_3'] = P[S == 3].sum()
-    out['DC_GR_4'] = P[S == 4].sum()
-    out['DC_GR_5+'] = P[S >= 5].sum()
-    
-    # Correct Scores (0-0 to 5-5 plus Other)
-    for h in range(6):
-        for a in range(6):
-            if h < P.shape[0] and a < P.shape[1]:
-                out[f'DC_CS_{h}_{a}'] = P[h, a]
-            else:
-                out[f'DC_CS_{h}_{a}'] = 0.0
-    
-    # Other scores (6+ goals for either team)
-    other_prob = 0.0
-    for h in range(P.shape[0]):
-        for a in range(P.shape[1]):
-            if h >= 6 or a >= 6:
-                other_prob += P[h, a]
-    out['DC_CS_Other'] = other_prob
     
     # Additional O/U diagnostics (for analysis)
     out['_expected_total_goals'] = lam + mu

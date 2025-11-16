@@ -186,8 +186,8 @@ def _pivot_back(match_df: pd.DataFrame, side_feats: pd.DataFrame) -> pd.DataFram
 # Targets for multiple markets
 # -----------------------------
 
-OU_LINES = [0.5, 1.5, 2.5, 3.5, 4.5]
-AH_LINES = [-1.0, -0.5, 0.0, 0.5, 1.0]
+OU_LINES = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]
+# AH_LINES removed - DC-only BTTS and O/U
 
 def _target_1x2(df: pd.DataFrame) -> pd.Series:
     return df["FTR"].astype(str);
@@ -275,38 +275,10 @@ def build_features(force: bool = False) -> Path:
         for c in ["B365H","B365D","B365A","PSCH","PSCD","PSCA"]:
             if c in df.columns: df[c] = np.nan
 
-    # Targets
-    df["y_1X2"] = _target_1x2(df)
+    # Targets - DC-ONLY: BTTS and Over/Under (0.5-5.5)
     df["y_BTTS"] = _target_btts(df).astype(str)
     for line in OU_LINES:
         df[f"y_OU_{str(line).replace('.','_')}"] = _target_ou(df, line).astype(str)
-    for line in AH_LINES:
-        df[f"y_AH_{str(line).replace('.','_')}"] = _target_ah_home(df, line).astype(str)
-    df["y_GOAL_RANGE"] = _target_goal_ranges(df)
-    df["y_CS"] = _target_correct_score(df, max_goal=5)
-
-    # Corners & Cards targets if source columns exist
-    df = _ensure_cols(df, ["HC","AC","HY","AY"])  # totals exist on many leagues
-    tot_corners = _maybe_sum_cols(df, "HC", "AC")
-    tot_cards_y = _maybe_sum_cols(df, "HY", "AY")
-    df["CornersTotal"] = tot_corners
-    df["CardsYTotal"] = tot_cards_y
-
-    # Bands (example): 0-7, 8-10, 11-13, 14+
-    if tot_corners.notna().any():
-        corners_bands = [(0,7),(8,10),(11,13)]
-        corners_labels = ["0-7","8-10","11-13"]
-        df["y_CORNERS_BAND"] = _target_bands(tot_corners, corners_bands, corners_labels)
-    else:
-        df["y_CORNERS_BAND"] = pd.Series(pd.NA, index=df.index, dtype=str)
-
-    # Cards bands: 0-3, 4-5, 6-7, 8+ (yellow-equivalent counts; reds ~ 2Y but we use Y only for simplicity)
-    if tot_cards_y.notna().any():
-        cards_bands = [(0,3),(4,5),(6,7)]
-        cards_labels = ["0-3","4-5","6-7"]
-        df["y_CARDSY_BAND"] = _target_bands(tot_cards_y, cards_bands, cards_labels)
-    else:
-        df["y_CARDSY_BAND"] = pd.Series(pd.NA, index=df.index, dtype=str)
 
     # Final ordering & save
     df.to_parquet(out_path, index=False)

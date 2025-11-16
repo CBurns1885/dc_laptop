@@ -26,8 +26,8 @@ from progress_utils import heartbeat
 from blending import BLEND_WEIGHTS_JSON
 
 ID_COLS = ["League","Date","HomeTeam","AwayTeam"]
-OU_LINES = ["0_5","1_5","2_5","3_5","4_5"]
-AH_LINES = ["-1_0","-0_5","0_0","+0_5","+1_0"]
+OU_LINES = ["0_5","1_5","2_5","3_5","4_5","5_5"]
+# AH_LINES removed - DC-only BTTS and O/U
 
 # League scoring profiles (learned from historical data)
 LEAGUE_PROFILES = {
