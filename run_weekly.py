@@ -54,6 +54,56 @@ if USE_ALL_LEAGUES:
 print("="*60)
 
 # ============================================================================
+# STEP -1: UPDATE ACCURACY FROM LAST WEEK (if applicable)
+# ============================================================================
+
+print("\n🎯 STEP -1: Updating Accuracy from Last Week's Predictions")
+print("="*60)
+
+try:
+    from pathlib import Path
+    accuracy_db = Path("outputs/accuracy_database.db")
+
+    if accuracy_db.exists():
+        print("✅ Found accuracy database")
+
+        # Check if there are pending predictions
+        import sqlite3
+        conn = sqlite3.connect(accuracy_db)
+        cursor = conn.cursor()
+        pending = cursor.execute("""
+            SELECT COUNT(*) FROM predictions WHERE actual_outcome IS NULL
+        """).fetchone()[0]
+        conn.close()
+
+        if pending > 0:
+            print(f"📊 Found {pending} predictions awaiting results")
+            print("🔄 Updating with latest match results...")
+
+            # Import and run update
+            from update_results import update_accuracy_database, show_recent_performance
+
+            success = update_accuracy_database()
+
+            if success:
+                print("\n📈 Recent Performance:")
+                print("-" * 60)
+                show_recent_performance(weeks=2)
+                print("-" * 60)
+            else:
+                print("⚠️ No new results available yet (matches may not have finished)")
+        else:
+            print("✅ No pending predictions (all up to date)")
+    else:
+        print("ℹ️ No accuracy database yet (will be created after first predictions)")
+
+except Exception as e:
+    print(f"⚠️ Accuracy update skipped: {e}")
+    print("   (This is normal for first run)")
+
+print("\n" + "="*60)
+
+# ============================================================================
 # STEP 0: DOWNLOAD FIXTURES
 # ============================================================================
 
