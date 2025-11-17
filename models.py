@@ -67,9 +67,13 @@ from config import (
     DATA_DIR, OUTPUT_DIR, MODEL_ARTIFACTS_DIR, FEATURES_PARQUET, RANDOM_SEED, log_header
 )
 from progress_utils import Timer, heartbeat
+
+# DC-ONLY: These imports are stubs - not used in Dixon-Coles workflow
+# They're here for backwards compatibility with legacy ML code paths
 from tuning import make_time_split, objective_factory, CVData
 from ordinal import CORALOrdinal
 from calibration import DirichletCalibrator, TemperatureScaler
+
 from models_dc import fit_all as dc_fit_all, price_match as dc_price_match
 
 
