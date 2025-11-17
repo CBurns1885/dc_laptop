@@ -185,44 +185,43 @@ class BacktestEngine:
             'league_markets': {}  # NEW: Track league+market combos
         }
         
-        # Define all markets to evaluate
+        # Define all markets to evaluate - DC-ONLY: BTTS and O/U (0.5-5.5)
         markets = {
-            # 1X2
-            '1X2': {
-                'actual': 'y_1X2',
-                'pred_cols': ['BLEND_1X2_H', 'BLEND_1X2_D', 'BLEND_1X2_A'],
-                'outcomes': ['H', 'D', 'A']
-            },
             # BTTS
             'BTTS': {
                 'actual': 'y_BTTS',
-                'pred_cols': ['BLEND_BTTS_Y', 'BLEND_BTTS_N'],
+                'pred_cols': ['P_BTTS_Y', 'P_BTTS_N'],
                 'outcomes': ['Y', 'N']
             },
             # Over/Under
             'OU_0_5': {
                 'actual': 'y_OU_0_5',
-                'pred_cols': ['BLEND_OU_0_5_O', 'BLEND_OU_0_5_U'],
+                'pred_cols': ['P_OU_0_5_O', 'P_OU_0_5_U'],
                 'outcomes': ['O', 'U']
             },
             'OU_1_5': {
                 'actual': 'y_OU_1_5',
-                'pred_cols': ['BLEND_OU_1_5_O', 'BLEND_OU_1_5_U'],
+                'pred_cols': ['P_OU_1_5_O', 'P_OU_1_5_U'],
                 'outcomes': ['O', 'U']
             },
             'OU_2_5': {
                 'actual': 'y_OU_2_5',
-                'pred_cols': ['BLEND_OU_2_5_O', 'BLEND_OU_2_5_U'],
+                'pred_cols': ['P_OU_2_5_O', 'P_OU_2_5_U'],
                 'outcomes': ['O', 'U']
             },
             'OU_3_5': {
                 'actual': 'y_OU_3_5',
-                'pred_cols': ['BLEND_OU_3_5_O', 'BLEND_OU_3_5_U'],
+                'pred_cols': ['P_OU_3_5_O', 'P_OU_3_5_U'],
                 'outcomes': ['O', 'U']
             },
             'OU_4_5': {
                 'actual': 'y_OU_4_5',
-                'pred_cols': ['BLEND_OU_4_5_O', 'BLEND_OU_4_5_U'],
+                'pred_cols': ['P_OU_4_5_O', 'P_OU_4_5_U'],
+                'outcomes': ['O', 'U']
+            },
+            'OU_5_5': {
+                'actual': 'y_OU_5_5',
+                'pred_cols': ['P_OU_5_5_O', 'P_OU_5_5_U'],
                 'outcomes': ['O', 'U']
             },
 

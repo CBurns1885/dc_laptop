@@ -23,7 +23,9 @@ from config import FEATURES_PARQUET, OUTPUT_DIR, MODEL_ARTIFACTS_DIR, log_header
 from models import load_trained_targets, predict_proba as model_predict
 from dc_predict import build_dc_for_fixtures
 from progress_utils import heartbeat
-from blending import BLEND_WEIGHTS_JSON
+
+# DC-ONLY: Blending removed, define path for legacy code compatibility
+BLEND_WEIGHTS_JSON = OUTPUT_DIR / "blend_weights.json"
 
 ID_COLS = ["League","Date","HomeTeam","AwayTeam"]
 OU_LINES = ["0_5","1_5","2_5","3_5","4_5","5_5"]
