@@ -2,6 +2,13 @@
 """
 Complete Backtesting Engine - Walk-Forward Validation
 Tests your actual prediction system on historical data with NO data leakage
+
+Features:
+- Walk-forward testing (no data leakage)
+- Accuracy and Brier score evaluation
+- Tiered calibration analysis (50-60%, 60-70%, 70-80%, 80-90%, 90-100%)
+- Best doubles/trebles finder
+- Period-by-period breakdown
 """
 
 import pandas as pd
@@ -182,7 +189,8 @@ class BacktestEngine:
         results = {
             'total_matches': len(df),
             'markets': {},
-            'league_markets': {}  # NEW: Track league+market combos
+            'league_markets': {},  # NEW: Track league+market combos
+            'all_predictions': []  # NEW: Track individual predictions for calibration
         }
         
         # Define all markets to evaluate - DC-ONLY: BTTS and O/U (0.5-5.5)
@@ -256,7 +264,26 @@ class BacktestEngine:
             # Map column names to outcomes
             outcome_map = {col: outcome for col, outcome in zip(pred_cols, outcomes)}
             predicted = pred_outcome_idx.map(outcome_map)
-            
+
+            # Track individual predictions for calibration analysis
+            for idx in actual.index:
+                pred_col = pred_outcome_idx[idx]
+                pred_prob = predictions.loc[idx, pred_col]
+
+                # Convert percentage string if needed
+                if isinstance(pred_prob, str):
+                    pred_prob = float(pred_prob.strip('%')) / 100
+
+                is_correct = (predicted[idx] == actual[idx])
+
+                results['all_predictions'].append({
+                    'market': market_name,
+                    'probability': float(pred_prob),
+                    'correct': bool(is_correct),
+                    'predicted': predicted[idx],
+                    'actual': actual[idx]
+                })
+
             # Calculate metrics
             correct = (predicted == actual).sum()
             total = len(actual)
@@ -290,7 +317,80 @@ class BacktestEngine:
             }
         
         return results
-    
+
+    def calculate_calibration_tiers(self, all_predictions: List[Dict]) -> pd.DataFrame:
+        """
+        Calculate calibration by probability tiers
+        Shows: At X% confidence, how often were we actually correct?
+
+        Example output:
+        Tier      | Predictions | Actual % | Expected % | Calibration
+        70-80%    | 145         | 76.5%    | 75%        | +1.5% (good)
+        80-90%    | 89          | 82.1%    | 85%        | -2.9% (slightly under)
+        """
+        # Define probability tiers
+        tiers = [
+            (0.50, 0.60, '50-60%'),
+            (0.60, 0.70, '60-70%'),
+            (0.70, 0.80, '70-80%'),
+            (0.80, 0.90, '80-90%'),
+            (0.90, 1.00, '90-100%'),
+        ]
+
+        calibration_results = []
+
+        for min_prob, max_prob, tier_name in tiers:
+            tier_data = []
+
+            for pred in all_predictions:
+                prob = pred['probability']
+                correct = pred['correct']
+                market = pred['market']
+
+                # Check if probability falls in this tier
+                if min_prob <= prob < max_prob:
+                    tier_data.append({
+                        'correct': correct,
+                        'market': market
+                    })
+
+            if len(tier_data) > 0:
+                n_predictions = len(tier_data)
+                n_correct = sum(1 for p in tier_data if p['correct'])
+                actual_accuracy = n_correct / n_predictions
+                expected_accuracy = (min_prob + max_prob) / 2
+                calibration_error = actual_accuracy - expected_accuracy
+
+                # Interpretation
+                if abs(calibration_error) < 0.03:
+                    status = "✅ Well-calibrated"
+                elif calibration_error > 0:
+                    status = f"📈 Overperforming +{calibration_error*100:.1f}%"
+                else:
+                    status = f"📉 Underperforming {calibration_error*100:.1f}%"
+
+                calibration_results.append({
+                    'Tier': tier_name,
+                    'Predictions': n_predictions,
+                    'Actual_%': round(actual_accuracy * 100, 1),
+                    'Expected_%': round(expected_accuracy * 100, 1),
+                    'Calibration_Error': round(calibration_error * 100, 1),
+                    'Status': status
+                })
+
+        return pd.DataFrame(calibration_results)
+
+    def collect_all_predictions(self, results_list: List[Dict]) -> List[Dict]:
+        """
+        Collect all individual predictions from backtest results
+        for calibration analysis
+        """
+        all_predictions = []
+
+        # We need to store predictions during evaluation
+        # This will be populated by modified evaluate_predictions
+        return all_predictions
+
     def run_backtest(self) -> pd.DataFrame:
         """Run complete walk-forward backtest"""
         print("\n🔬 BACKTESTING ENGINE")
@@ -402,7 +502,40 @@ class BacktestEngine:
         
         print("\n📊 OVERALL MARKET PERFORMANCE:")
         print(summary_df.to_string())
-        
+
+        # 1.5 Calibration analysis (tiered accuracy)
+        print("\n" + "="*60)
+        print("🎯 CALIBRATION ANALYSIS - Tiered Accuracy")
+        print("="*60)
+        print("Shows: At X% confidence, how often were we actually correct?")
+        print()
+
+        # Collect all predictions across all periods
+        all_predictions = []
+        for result in self.results:
+            all_predictions.extend(result.get('all_predictions', []))
+
+        if len(all_predictions) > 0:
+            calibration_df = self.calculate_calibration_tiers(all_predictions)
+
+            if not calibration_df.empty:
+                print(calibration_df.to_string(index=False))
+
+                # Save calibration report
+                calibration_path = OUTPUT_DIR / "backtest_calibration.csv"
+                calibration_df.to_csv(calibration_path, index=False)
+                print(f"\n✅ Saved calibration report: {calibration_path}")
+
+                # Quick interpretation
+                print("\n💡 CALIBRATION GUIDE:")
+                print("   • Well-calibrated: Actual % within ±3% of expected")
+                print("   • Overperforming: Better than predicted (conservative)")
+                print("   • Underperforming: Worse than predicted (overconfident)")
+            else:
+                print("⚠️ Not enough data for calibration analysis")
+        else:
+            print("⚠️ No predictions collected for calibration analysis")
+
         # 2. League-specific analysis
         self.analyze_by_league()
         
