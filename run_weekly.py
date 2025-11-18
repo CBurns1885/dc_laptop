@@ -203,7 +203,7 @@ print(f"   Incremental training: ENABLED (reuses models when possible)")
 # RUN PIPELINE WITH ERROR RECOVERY
 # ============================================================================
 
-TOTAL_STEPS = 17
+TOTAL_STEPS = 18
 errors = []
 
 def run_step(step_num, step_name, func, *args, **kwargs):
@@ -552,9 +552,33 @@ try:
             print("⚠️ weekly_bets_lite.csv not found, skipping accuracy tracking")
     
     run_step(16, "UPDATE ACCURACY DATABASE", step16)
-    
-    # Step 17: Archive outputs
+
+    # Step 17: Generate Excel Report and Send Email
     def step17():
+        from excel_generator import generate_excel_report
+        from email_sender import send_weekly_predictions
+
+        csv_path = OUTPUT_DIR / "weekly_bets.csv"
+
+        if csv_path.exists():
+            # Generate Excel file
+            excel_file = generate_excel_report(csv_path, OUTPUT_DIR)
+
+            # Try to send via email (optional - won't fail if not configured)
+            html_report = OUTPUT_DIR / "top50_weighted.html"
+            if not html_report.exists():
+                html_report = None
+
+            send_weekly_predictions(excel_file, html_report)
+
+            print(f"✅ Excel report generated: {excel_file.name}")
+        else:
+            raise FileNotFoundError("weekly_bets.csv not found")
+
+    run_step(17, "GENERATE EXCEL & SEND EMAIL", step17)
+
+    # Step 18: Archive outputs
+    def step18():
         """Copy all output files to dated archive folder"""
         import shutil
         from datetime import datetime
@@ -605,8 +629,8 @@ try:
             archived_count += 1
         
         print(f"✅ Archived {archived_count} files to {archive_dir}")
-    
-    run_step(17, "ARCHIVE OUTPUTS", step17)
+
+    run_step(18, "ARCHIVE OUTPUTS", step18)
     
     # ========================================================================
     # SUCCESS SUMMARY
