@@ -15,6 +15,31 @@ from pathlib import Path
 from datetime import datetime
 
 # ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def safe_get(row, column, default=0.0):
+    """
+    Safely get value from row, handling NaN and missing columns
+
+    Args:
+        row: pandas Series (row from DataFrame)
+        column: column name
+        default: default value if missing or NaN
+
+    Returns:
+        float: value or default if NaN/missing
+    """
+    try:
+        value = row.get(column, default)
+        # Check if value is NaN
+        if pd.isna(value):
+            return default
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+# ============================================================================
 # CONFIGURATION
 # ============================================================================
 today = datetime.now().strftime("%Y-%m-%d")
@@ -72,10 +97,10 @@ class BetFinder:
 
     def check_btts_yes(self, row):
         """Check if BTTS Yes meets criteria"""
-        prob = row.get('P_BTTS_Y', 0)
-        conf = row.get('CONF_BTTS_Y', 0)
-        agree = row.get('AGREE_BTTS_Y', 0)
-        dc_prob = row.get('DC_BTTS_Y', 0)
+        prob = safe_get(row, 'P_BTTS_Y', 0.0)
+        conf = safe_get(row, 'CONF_BTTS_Y', 0.0)
+        agree = safe_get(row, 'AGREE_BTTS_Y', 0.0)
+        dc_prob = safe_get(row, 'DC_BTTS_Y', 0.0)
 
         if prob < self.config['min_prob_btts']:
             return None
@@ -84,12 +109,12 @@ class BetFinder:
         if agree < self.config['min_agreement']:
             return None
 
-        if self.config['dc_validation'] and pd.notna(dc_prob):
+        if self.config['dc_validation'] and dc_prob > 0:
             if abs(prob - dc_prob) > self.config['dc_max_diff']:
                 return None
 
         # Logic check: High BTTS should correlate with higher goal totals
-        ou25_over = row.get('P_OU_2_5_O', 0)
+        ou25_over = safe_get(row, 'P_OU_2_5_O', 0.0)
         if prob > 0.7 and ou25_over < 0.5:
             return None
 
@@ -99,16 +124,16 @@ class BetFinder:
             'Probability': prob,
             'Confidence': conf,
             'Agreement': agree,
-            'DC_Probability': dc_prob if pd.notna(dc_prob) else None,
+            'DC_Probability': dc_prob if dc_prob > 0 else None,
             'ImpliedOdds': round(1 / prob, 2) if prob > 0 else None,
         }
 
     def check_btts_no(self, row):
         """Check if BTTS No meets criteria"""
-        prob = row.get('P_BTTS_N', 0)
-        conf = row.get('CONF_BTTS_N', 0)
-        agree = row.get('AGREE_BTTS_N', 0)
-        dc_prob = row.get('DC_BTTS_N', 0)
+        prob = safe_get(row, 'P_BTTS_N', 0.0)
+        conf = safe_get(row, 'CONF_BTTS_N', 0.0)
+        agree = safe_get(row, 'AGREE_BTTS_N', 0.0)
+        dc_prob = safe_get(row, 'DC_BTTS_N', 0.0)
 
         if prob < self.config['min_prob_btts']:
             return None
@@ -117,7 +142,7 @@ class BetFinder:
         if agree < self.config['min_agreement']:
             return None
 
-        if self.config['dc_validation'] and pd.notna(dc_prob):
+        if self.config['dc_validation'] and dc_prob > 0:
             if abs(prob - dc_prob) > self.config['dc_max_diff']:
                 return None
 
@@ -127,7 +152,7 @@ class BetFinder:
             'Probability': prob,
             'Confidence': conf,
             'Agreement': agree,
-            'DC_Probability': dc_prob if pd.notna(dc_prob) else None,
+            'DC_Probability': dc_prob if dc_prob > 0 else None,
             'ImpliedOdds': round(1 / prob, 2) if prob > 0 else None,
         }
 
@@ -138,13 +163,13 @@ class BetFinder:
     def check_ou_market(self, row, line, over_under):
         """Generic checker for any O/U line (0.5-5.5)"""
         ou_type = 'O' if over_under == 'Over' else 'U'
-        prob = row.get(f'P_OU_{line}_{ou_type}', 0)
+        prob = safe_get(row, f'P_OU_{line}_{ou_type}', 0.0)
 
         # Confidence and agreement
         conf_col = f'CONF_OU_{line}_{ou_type}'
         agree_col = f'AGREE_OU_{line}_{ou_type}'
-        conf = row.get(conf_col, prob)  # Use prob as fallback
-        agree = row.get(agree_col, prob * 100)  # Use prob as fallback
+        conf = safe_get(row, conf_col, prob)  # Use prob as fallback
+        agree = safe_get(row, agree_col, prob * 100)  # Use prob as fallback
 
         if prob < self.config['min_prob_ou']:
             return None
@@ -155,8 +180,8 @@ class BetFinder:
             if agree < self.config['min_agreement']:
                 return None
 
-        dc_prob = row.get(f'DC_OU_{line}_{ou_type}', 0)
-        if self.config['dc_validation'] and pd.notna(dc_prob):
+        dc_prob = safe_get(row, f'DC_OU_{line}_{ou_type}', 0.0)
+        if self.config['dc_validation'] and dc_prob > 0:
             if abs(prob - dc_prob) > self.config['dc_max_diff']:
                 return None
 
@@ -166,7 +191,7 @@ class BetFinder:
             'Probability': prob,
             'Confidence': conf,
             'Agreement': agree,
-            'DC_Probability': dc_prob if pd.notna(dc_prob) else None,
+            'DC_Probability': dc_prob if dc_prob > 0 else None,
             'ImpliedOdds': round(1 / prob, 2) if prob > 0 else None,
         }
 
