@@ -45,11 +45,11 @@ def download(leagues: Iterable[str], seasons: Iterable[int]) -> None:
                     r = requests.get(url, timeout=30)
                     if r.status_code == 200 and (len(r.content) > 150):  # basic sanity check
                         out.write_bytes(r.content)
-                        print(f"  ↳ saved {out}")
+                        print(f"   saved {out}")
                     else:
-                        print(f"  ↳ skip {lg} {sc}: not available ({r.status_code})")
+                        print(f"   skip {lg} {sc}: not available ({r.status_code})")
                 except Exception as e:
-                    print(f"  ↳ error {lg} {sc}: {e}")
+                    print(f"   error {lg} {sc}: {e}")
 
 if __name__ == "__main__":
     import argparse, datetime as dt

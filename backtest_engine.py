@@ -52,7 +52,7 @@ class BacktestEngine:
         df['Date'] = pd.to_datetime(df['Date'])
         df = df.sort_values('Date').reset_index(drop=True)
         
-        print(f"✅ Loaded {len(df)} matches from {df['Date'].min()} to {df['Date'].max()}")
+        print(f" Loaded {len(df)} matches from {df['Date'].min()} to {df['Date'].max()}")
         return df
     
     def get_test_weeks(self) -> List[Tuple[pd.Timestamp, pd.Timestamp]]:
@@ -118,7 +118,7 @@ class BacktestEngine:
                 model.fit(X_train_market, y_train)
                 models[market] = model
             except Exception as e:
-                print(f"   ⚠️ Failed to train {market}: {e}")
+                print(f"    Failed to train {market}: {e}")
         
         return models
     
@@ -142,7 +142,7 @@ class BacktestEngine:
                     predictions[col_name] = pred_proba[:, idx]
                 
             except Exception as e:
-                print(f"   ⚠️ Prediction failed for {market}: {e}")
+                print(f"    Prediction failed for {market}: {e}")
         
         return predictions
     
@@ -218,7 +218,7 @@ class BacktestEngine:
     
     def run_backtest(self) -> pd.DataFrame:
         """Run full walk-forward backtest"""
-        print("\n🔬 BACKTESTING ENGINE")
+        print("\n BACKTESTING ENGINE")
         print("="*60)
         print(f"Period: {self.start_date.date()} to {self.end_date.date()}")
         print(f"Test window: {self.test_window_days} days")
@@ -234,7 +234,7 @@ class BacktestEngine:
         
         # Generate test periods
         test_weeks = self.get_test_weeks()
-        print(f"📅 Testing {len(test_weeks)} periods\n")
+        print(f" Testing {len(test_weeks)} periods\n")
         
         all_results = []
         
@@ -245,15 +245,15 @@ class BacktestEngine:
             train_df, test_df = self.split_train_test(full_df, test_start, test_end)
             
             if train_df is None or len(test_df) == 0:
-                print(f"   ⚠️ Skipping: insufficient data")
+                print(f"    Skipping: insufficient data")
                 continue
             
-            print(f"   📊 Training: {len(train_df)} matches | Testing: {len(test_df)} matches")
+            print(f"    Training: {len(train_df)} matches | Testing: {len(test_df)} matches")
             
             # Train models
             models = self.train_on_period(train_df)
             if not models:
-                print(f"   ⚠️ No models trained")
+                print(f"    No models trained")
                 continue
             
             # Generate predictions
@@ -281,7 +281,7 @@ class BacktestEngine:
             return pd.DataFrame()
         
         print("\n" + "="*60)
-        print("📊 BACKTEST SUMMARY")
+        print(" BACKTEST SUMMARY")
         print("="*60)
         
         # Aggregate by market
@@ -323,7 +323,7 @@ class BacktestEngine:
         # Save to file
         output_path = OUTPUT_DIR / "backtest_summary.csv"
         summary_df.to_csv(output_path)
-        print(f"✅ Saved summary: {output_path}")
+        print(f" Saved summary: {output_path}")
         
         return summary_df
     
@@ -344,7 +344,7 @@ class BacktestEngine:
         output_path = OUTPUT_DIR / "backtest_detailed.csv"
         detailed_df.to_csv(output_path, index=False)
         
-        print(f"✅ Saved detailed results: {output_path}")
+        print(f" Saved detailed results: {output_path}")
         return output_path
 
 

@@ -29,7 +29,7 @@ BLEND_WEIGHTS_JSON = OUTPUT_DIR / "blend_weights.json"
 
 ID_COLS = ["League","Date","HomeTeam","AwayTeam"]
 OU_LINES = ["0_5","1_5","2_5","3_5","4_5","5_5"]
-# AH_LINES removed - DC-only BTTS and O/U
+AH_LINES = []  # DC-only BTTS and O/U (AH disabled)
 
 # League scoring profiles (learned from historical data)
 LEAGUE_PROFILES = {
@@ -622,7 +622,7 @@ def _generate_html_for_top(top_df, parse_market_func, title_suffix=""):
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <title>🎯 ULTIMATE Predictions{title_suffix} - {len(top_df)} Elite Picks</title>
+    <title> ULTIMATE Predictions{title_suffix} - {len(top_df)} Elite Picks</title>
     <style>
         * {{box-sizing: border-box; margin: 0; padding: 0;}}
         body {{
@@ -726,7 +726,7 @@ def _generate_html_for_top(top_df, parse_market_func, title_suffix=""):
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🎯 ULTIMATE PREDICTIONS{title_suffix}</h1>
+            <h1> ULTIMATE PREDICTIONS{title_suffix}</h1>
             <p>{len(top_df)} Elite Picks - Sorted by Confidence & Probability</p>
         </div>
         <table>
@@ -791,7 +791,20 @@ def _generate_html_for_top(top_df, parse_market_func, title_suffix=""):
 
 def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = None):
     """Enhanced HTML report with confidence scores"""
-    prob_cols = [c for c in df.columns if c.startswith("BLEND_") or c.startswith("P_") or c.startswith("DC_")]
+    # Only use probability columns that have real data (not 0.0 or 1.0 defaults)
+    prob_cols = []
+    for c in df.columns:
+        if c.startswith("BLEND_") or c.startswith("DC_"):
+            prob_cols.append(c)
+        elif c.startswith("P_"):
+            # Only include P_ columns if they have realistic probabilities (not all 0 or 1)
+            values = df[c].dropna()
+            if len(values) > 0:
+                unique_vals = values.unique()
+                # Skip if column only has 0.0 and/or 1.0 (untrained model)
+                if not (len(unique_vals) <= 2 and all(v in [0.0, 1.0] for v in unique_vals)):
+                    prob_cols.append(c)
+
     if not prob_cols:
         print("Warning: No probability columns found")
         return
@@ -809,21 +822,22 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
     
     # Filter meaningful predictions
     meaningful = df2[(df2["BestProb"] > 0.5) & (df2["AvgConfidence"] > 0.5)]
-    
+
     if len(meaningful) >= 10:
-        top = meaningful.sort_values(["AvgConfidence", "BestProb"], ascending=[False, False]).head(50)
+        # Sort by Date, League, then by confidence and probability
+        top = meaningful.sort_values(["Date", "League", "AvgConfidence", "BestProb"], ascending=[True, True, False, False]).head(50)
     else:
-        top = df2.sort_values("BestProb", ascending=False).head(50)
+        top = df2.sort_values(["Date", "League", "BestProb"], ascending=[True, True, False]).head(50)
 
     # Also create a version excluding O/U 0.5 markets
     ou_05_columns = [c for c in prob_cols if 'OU_0_5' in c]
     if ou_05_columns:
         df_no_ou05 = df2.copy()
-        # Set O/U 0.5 probabilities to 0 so they won't be selected as BestMarket
-        for col in ou_05_columns:
-            df_no_ou05[col] = 0
-        df_no_ou05["BestProb"] = df_no_ou05[prob_cols].max(axis=1)
-        df_no_ou05["BestMarket"] = df_no_ou05[prob_cols].idxmax(axis=1)
+        # Create list of probability columns WITHOUT O/U 0.5
+        prob_cols_no_ou05 = [c for c in prob_cols if 'OU_0_5' not in c]
+        # Recalculate BestProb and BestMarket using only non-O/U 0.5 columns
+        df_no_ou05["BestProb"] = df_no_ou05[prob_cols_no_ou05].max(axis=1)
+        df_no_ou05["BestMarket"] = df_no_ou05[prob_cols_no_ou05].idxmax(axis=1)
 
         # Recalculate AvgConfidence excluding O/U 0.5
         if conf_cols:
@@ -832,9 +846,10 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
         meaningful_no_ou05 = df_no_ou05[(df_no_ou05["BestProb"] > 0.5) & (df_no_ou05["AvgConfidence"] > 0.5)]
 
         if len(meaningful_no_ou05) >= 10:
-            top_no_ou05 = meaningful_no_ou05.sort_values(["AvgConfidence", "BestProb"], ascending=[False, False]).head(50)
+            # Sort by Date, League, then by confidence and probability
+            top_no_ou05 = meaningful_no_ou05.sort_values(["Date", "League", "AvgConfidence", "BestProb"], ascending=[True, True, False, False]).head(50)
         else:
-            top_no_ou05 = df_no_ou05.sort_values("BestProb", ascending=False).head(50)
+            top_no_ou05 = df_no_ou05.sort_values(["Date", "League", "BestProb"], ascending=[True, True, False]).head(50)
     else:
         top_no_ou05 = None
 
@@ -870,13 +885,13 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
     
     out_path = path / "top50_ultimate.html"
     out_path.write_text(html, encoding="utf-8")
-    print(f"✅ Wrote ULTIMATE HTML -> {out_path}")
+    print(f" Wrote ULTIMATE HTML -> {out_path}")
 
     if secondary_path:
         secondary_path.mkdir(parents=True, exist_ok=True)
         secondary_out = secondary_path / "top50_ultimate.html"
         secondary_out.write_text(html, encoding="utf-8")
-        print(f"✅ Wrote ULTIMATE HTML (copy) -> {secondary_out}")
+        print(f" Wrote ULTIMATE HTML (copy) -> {secondary_out}")
 
     # Generate second version excluding O/U 0.5
     if top_no_ou05 is not None and len(top_no_ou05) > 0:
@@ -884,17 +899,17 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
 
         out_path_no_ou05 = path / "top50_ultimate_no_ou05.html"
         out_path_no_ou05.write_text(html_no_ou05, encoding="utf-8")
-        print(f"✅ Wrote ULTIMATE HTML (No O/U 0.5) -> {out_path_no_ou05}")
+        print(f" Wrote ULTIMATE HTML (No O/U 0.5) -> {out_path_no_ou05}")
 
         if secondary_path:
             secondary_out_no_ou05 = secondary_path / "top50_ultimate_no_ou05.html"
             secondary_out_no_ou05.write_text(html_no_ou05, encoding="utf-8")
-            print(f"✅ Wrote ULTIMATE HTML (No O/U 0.5, copy) -> {secondary_out_no_ou05}")
+            print(f" Wrote ULTIMATE HTML (No O/U 0.5, copy) -> {secondary_out_no_ou05}")
 
 def predict_week(fixtures_csv: Path) -> Path:
     """ULTIMATE prediction pipeline"""
     
-    log_header("🎯 ULTIMATE WEEKLY PREDICTIONS")
+    log_header(" ULTIMATE WEEKLY PREDICTIONS")
     print("Maximum Accuracy Features:")
     print("  • League-specific calibration")
     print("  • Cross-market constraints")
@@ -945,9 +960,9 @@ def predict_week(fixtures_csv: Path) -> Path:
             if col in dc_df.columns:
                 df_out[col] = dc_df[col].values[:len(df_out)]
         
-        print(f"✅ Merged {len(dc_cols)} DC predictions")
+        print(f" Merged {len(dc_cols)} DC predictions")
     except Exception as e:
-        print(f"⚠️ DC predictions failed: {e}")
+        print(f" DC predictions failed: {e}")
     
     # Apply enhanced blending
     log_header("APPLY DYNAMIC BLENDING")
@@ -961,12 +976,17 @@ def predict_week(fixtures_csv: Path) -> Path:
     if 'Date' in df_out.columns:
         df_out['Date'] = pd.to_datetime(df_out['Date'], errors='coerce')
         df_out = df_out.sort_values(['Date', 'League'], ascending=[True, True])
-        print("✅ Sorted output by Date and League")
+        print(" Sorted output by Date and League")
 
     # Save
     output_path = OUTPUT_DIR / "weekly_bets_lite.csv"
     df_out.to_csv(output_path, index=False)
-    print(f"\n✅ Saved predictions: {output_path}")
+    print(f"\n Saved predictions: {output_path}")
+
+    # Also save as weekly_bets.csv for compatibility with downstream tools
+    output_path_compat = OUTPUT_DIR / "weekly_bets.csv"
+    df_out.to_csv(output_path_compat, index=False)
+    print(f" Saved predictions (compat): {output_path_compat}")
     
     # Generate HTML
     log_header("GENERATE REPORTS")
@@ -975,7 +995,7 @@ def predict_week(fixtures_csv: Path) -> Path:
     
     # Summary
     print(f"\n{'='*60}")
-    print(f"📊 ULTIMATE PREDICTION SUMMARY")
+    print(f" ULTIMATE PREDICTION SUMMARY")
     print(f"{'='*60}")
     print(f"Total matches: {len(df_out)}")
     print(f"Leagues: {df_out['League'].unique().tolist() if 'League' in df_out.columns else 'N/A'}")

@@ -94,4 +94,4 @@ EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
 EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "")
 
-print(f"📁 Output directory: {OUTPUT_DIR}")
+print(f"Output directory: {OUTPUT_DIR}")

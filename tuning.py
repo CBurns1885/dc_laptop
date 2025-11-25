@@ -23,7 +23,12 @@ class TimeSeriesSplit:
         self.n_samples = n_samples
         self.n_folds = n_folds
         fold_size = n_samples // (n_folds + 1)
-        self.test_fold = np.repeat(np.arange(n_folds), fold_size)[:n_samples]
+        # Create array with exactly n_samples elements
+        folds = np.repeat(np.arange(n_folds), fold_size)
+        # Pad with last fold if needed to reach n_samples
+        if len(folds) < n_samples:
+            folds = np.concatenate([folds, np.full(n_samples - len(folds), n_folds - 1)])
+        self.test_fold = folds[:n_samples]
 
 def make_time_split(n_samples: int, n_folds: int = 5) -> TimeSeriesSplit:
     """Create time-series aware cross-validation split"""

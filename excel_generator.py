@@ -31,7 +31,7 @@ def generate_excel_report(predictions_csv: Path, output_dir: Path = None) -> Pat
     # Load predictions
     df = pd.read_csv(predictions_csv)
 
-    print("\n📊 Generating Multi-Sheet Excel Report")
+    print("\n Generating Multi-Sheet Excel Report")
     print("="*60)
 
     # Create Excel writer
@@ -43,7 +43,7 @@ def generate_excel_report(predictions_csv: Path, output_dir: Path = None) -> Pat
         # ==================================================================
         # SHEET 1: Top 10 from each market
         # ==================================================================
-        print("📄 Sheet 1: Top 10 from each market...")
+        print(" Sheet 1: Top 10 from each market...")
 
         # Define markets to extract
         markets = {
@@ -101,12 +101,12 @@ def generate_excel_report(predictions_csv: Path, output_dir: Path = None) -> Pat
         if top10_rows:
             top10_df = pd.concat(top10_rows, ignore_index=True)
             top10_df.to_excel(writer, sheet_name='Top 10 All Markets', index=False)
-            print(f"   ✅ Added {len(top10_df)} top predictions")
+            print(f"    Added {len(top10_df)} top predictions")
 
         # ==================================================================
         # SHEETS 2-8: Individual market sheets
         # ==================================================================
-        print("\n📄 Individual market sheets...")
+        print("\n Individual market sheets...")
 
         for market_name, prob_cols in markets.items():
             available_cols = [c for c in prob_cols if c in df.columns]
@@ -152,12 +152,12 @@ def generate_excel_report(predictions_csv: Path, output_dir: Path = None) -> Pat
             # Write to sheet (sheet name max 31 chars)
             sheet_name = market_name[:31]
             market_df.to_excel(writer, sheet_name=sheet_name, index=False)
-            print(f"   ✅ {market_name}: {len(market_df)} predictions")
+            print(f"    {market_name}: {len(market_df)} predictions")
 
         # ==================================================================
         # Format sheets
         # ==================================================================
-        print("\n🎨 Formatting sheets...")
+        print("\n Formatting sheets...")
 
         # Auto-adjust column widths
         for sheet_name in writer.sheets:
@@ -177,8 +177,8 @@ def generate_excel_report(predictions_csv: Path, output_dir: Path = None) -> Pat
             # Freeze top row
             worksheet.freeze_panes = 'A2'
 
-    print(f"\n✅ Excel report saved: {excel_path}")
-    print(f"   📊 {len(writer.sheets)} sheets created")
+    print(f"\n Excel report saved: {excel_path}")
+    print(f"    {len(writer.sheets)} sheets created")
     return excel_path
 
 
@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     if input_csv.exists():
         excel_file = generate_excel_report(input_csv)
-        print(f"\n🎯 Report ready: {excel_file}")
+        print(f"\n Report ready: {excel_file}")
     else:
-        print(f"❌ Input file not found: {input_csv}")
+        print(f" Input file not found: {input_csv}")
         print("   Run predict.py first to generate predictions")

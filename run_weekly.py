@@ -45,7 +45,7 @@ DEFAULT_LEAGUES = ["E0", "E1", "E2", "E3", "EC",
 print("="*60)
 print("FOOTBALL PREDICTION SYSTEM - WEEKLY RUN")
 print("="*60)
-print(f"\n📋 Configuration:")
+print(f"\n Configuration:")
 print(f"   Training Years: {TRAINING_START_YEAR}-{datetime.datetime.now().year}")
 print(f"   Optuna Trials: {os.environ.get('OPTUNA_TRIALS', '0')}")
 print(f"   League Mode: {'ALL LEAGUES' if USE_ALL_LEAGUES else 'AUTO-DETECT FROM FIXTURES'}")
@@ -57,7 +57,7 @@ print("="*60)
 # STEP -1: UPDATE ACCURACY FROM LAST WEEK (if applicable)
 # ============================================================================
 
-print("\n🎯 STEP -1: Updating Accuracy from Last Week's Predictions")
+print("\n STEP -1: Updating Accuracy from Last Week's Predictions")
 print("="*60)
 
 try:
@@ -65,7 +65,7 @@ try:
     accuracy_db = Path("outputs/accuracy_database.db")
 
     if accuracy_db.exists():
-        print("✅ Found accuracy database")
+        print(" Found accuracy database")
 
         # Check if there are pending predictions
         import sqlite3
@@ -77,8 +77,8 @@ try:
         conn.close()
 
         if pending > 0:
-            print(f"📊 Found {pending} predictions awaiting results")
-            print("🔄 Updating with latest match results...")
+            print(f" Found {pending} predictions awaiting results")
+            print(" Updating with latest match results...")
 
             # Import and run update
             from update_results import update_accuracy_database, show_recent_performance
@@ -86,19 +86,19 @@ try:
             success = update_accuracy_database()
 
             if success:
-                print("\n📈 Recent Performance:")
+                print("\n Recent Performance:")
                 print("-" * 60)
                 show_recent_performance(weeks=2)
                 print("-" * 60)
             else:
-                print("⚠️ No new results available yet (matches may not have finished)")
+                print(" No new results available yet (matches may not have finished)")
         else:
-            print("✅ No pending predictions (all up to date)")
+            print(" No pending predictions (all up to date)")
     else:
-        print("ℹ️ No accuracy database yet (will be created after first predictions)")
+        print("ℹ No accuracy database yet (will be created after first predictions)")
 
 except Exception as e:
-    print(f"⚠️ Accuracy update skipped: {e}")
+    print(f" Accuracy update skipped: {e}")
     print("   (This is normal for first run)")
 
 print("\n" + "="*60)
@@ -190,7 +190,7 @@ except Exception as e:
 # ============================================================================
 
 print("\n" + "="*60)
-print("⚙️ CONFIGURATION")
+print(" CONFIGURATION")
 print("="*60)
 
 print(f"   Optuna trials: {os.environ['OPTUNA_TRIALS']} (0=no tuning for fast incremental updates)")
@@ -207,20 +207,25 @@ TOTAL_STEPS = 18
 errors = []
 
 def run_step(step_num, step_name, func, *args, **kwargs):
-    """Run a step with error recovery"""
+    """Run a step with error recovery and timing"""
+    import time
+
     percentage = int((step_num / TOTAL_STEPS) * 100)
     print(f"\n{'='*60}")
     print(f"STEP {step_num}/{TOTAL_STEPS} ({percentage}%): {step_name}")
     print('='*60)
-    
+
+    step_start = time.time()
     try:
         result = func(*args, **kwargs)
-        print(f"✅ Step {step_num} complete")
+        step_elapsed = time.time() - step_start
+        print(f" Step {step_num} complete ({step_elapsed:.1f}s)")
         return result, None
     except Exception as e:
+        step_elapsed = time.time() - step_start
         error_msg = f"Step {step_num} ({step_name}): {str(e)}"
         errors.append(error_msg)
-        print(f"⚠️ Step {step_num} failed: {e}")
+        print(f" Step {step_num} failed: {e} ({step_elapsed:.1f}s)")
         print("   Continuing to next step...")
         return None, error_msg
 
@@ -244,7 +249,7 @@ try:
 
         # Check if user wants to override with all leagues
         if USE_ALL_LEAGUES:
-            print(f"🔧 USE_ALL_LEAGUES=True - Using all {len(DEFAULT_LEAGUES)} leagues")
+            print(f" USE_ALL_LEAGUES=True - Using all {len(DEFAULT_LEAGUES)} leagues")
             leagues_to_download = DEFAULT_LEAGUES
         elif fixtures_file and fixtures_file.exists():
             try:
@@ -257,7 +262,7 @@ try:
                 if 'League' in fixtures_df.columns:
                     fixture_leagues = fixtures_df['League'].dropna().unique().tolist()
                     leagues_to_download = sorted(set(fixture_leagues))  # Remove duplicates and sort
-                    print(f"📋 Leagues found in fixtures: {leagues_to_download}")
+                    print(f" Leagues found in fixtures: {leagues_to_download}")
 
                     # Check fixture freshness
                     if 'Date' in fixtures_df.columns:
@@ -266,22 +271,22 @@ try:
                         days_ahead = (latest_fixture - pd.Timestamp.now()).days
 
                         if days_ahead < 0:
-                            print(f"⚠️ WARNING: Fixtures are {abs(days_ahead)} days old!")
+                            print(f" WARNING: Fixtures are {abs(days_ahead)} days old!")
                             print(f"   Latest fixture: {latest_fixture.strftime('%Y-%m-%d')}")
                             print(f"   Consider downloading fresh fixtures")
                         elif days_ahead > 14:
-                            print(f"ℹ️ Fixtures cover next {days_ahead} days")
+                            print(f"ℹ Fixtures cover next {days_ahead} days")
                         else:
-                            print(f"✅ Fixtures are current (next {days_ahead} days)")
+                            print(f" Fixtures are current (next {days_ahead} days)")
                 else:
-                    print(f"⚠️ No 'League' column found, using defaults: {DEFAULT_LEAGUES}")
+                    print(f" No 'League' column found, using defaults: {DEFAULT_LEAGUES}")
             except Exception as e:
-                print(f"⚠️ Could not read fixtures for league detection: {e}")
+                print(f" Could not read fixtures for league detection: {e}")
                 print(f"   Using default leagues: {DEFAULT_LEAGUES}")
         else:
-            print(f"⚠️ No fixtures file found, using default leagues: {DEFAULT_LEAGUES}")
+            print(f" No fixtures file found, using default leagues: {DEFAULT_LEAGUES}")
 
-        print(f"📅 Downloading {TRAINING_START_YEAR}-{dt.datetime.now().year}...")
+        print(f" Downloading {TRAINING_START_YEAR}-{dt.datetime.now().year}...")
         print(f"   Leagues: {leagues_to_download}")
 
         # Download with better error handling per league
@@ -295,7 +300,7 @@ try:
     def step2():
         if USE_ALL_LEAGUES:
             league_context['detected_leagues'] = DEFAULT_LEAGUES
-            print(f"📋 Building database for all leagues (USE_ALL_LEAGUES=True)")
+            print(f" Building database for all leagues (USE_ALL_LEAGUES=True)")
         elif fixtures_file and fixtures_file.exists():
             try:
                 import pandas as pd
@@ -306,9 +311,9 @@ try:
 
                 if 'League' in fixtures_df.columns:
                     league_context['detected_leagues'] = sorted(set(fixtures_df['League'].dropna().unique().tolist()))
-                    print(f"📋 Building database for leagues: {league_context['detected_leagues']}")
+                    print(f" Building database for leagues: {league_context['detected_leagues']}")
             except Exception as e:
-                print(f"⚠️ Could not read fixtures for filtering: {e}")
+                print(f" Could not read fixtures for filtering: {e}")
 
         build_historical_results(force=True)
 
@@ -324,14 +329,14 @@ try:
     def step4():
         from generate_and_load_stats import generate_statistics
         generate_statistics()
-        print("✅ Team/referee statistics generated")
+        print(" Team/referee statistics generated")
     
     run_step(4, "GENERATE STATISTICS", step4)
     
     # Step 5: Build features (filtered to detected leagues only)
     def step5():
         if league_context['detected_leagues']:
-            print(f"🔧 Filtering to leagues: {league_context['detected_leagues']}")
+            print(f" Filtering to leagues: {league_context['detected_leagues']}")
             # Filter historical data to only detected leagues before building features
             hist_path = Path("data/processed/historical_matches.parquet")
             hist_backup = Path("data/processed/historical_matches_full.parquet")
@@ -341,10 +346,10 @@ try:
 
                 # Backup full data if not already backed up (for future runs)
                 if not hist_backup.exists():
-                    print(f"📦 Creating backup of full historical data...")
+                    print(f" Creating backup of full historical data...")
                     df_full = pd.read_parquet(hist_path)
                     df_full.to_parquet(hist_backup, index=False)
-                    print(f"✅ Backed up {len(df_full):,} matches to {hist_backup.name}")
+                    print(f" Backed up {len(df_full):,} matches to {hist_backup.name}")
 
                 # Load full data from backup
                 df_hist = pd.read_parquet(hist_backup)
@@ -361,7 +366,7 @@ try:
 
                 # Save filtered data for feature building
                 df_hist.to_parquet(hist_path, index=False)
-                print(f"✅ Historical data filtered (original preserved in backup)")
+                print(f" Historical data filtered (original preserved in backup)")
 
         build_features(force=True)
 
@@ -407,11 +412,11 @@ try:
                 
                 import shutil
                 shutil.copy(output_path, csv_path)
-                print("✅ BTTS/O/U optimized with historical patterns")
+                print(" BTTS/O/U optimized with historical patterns")
             else:
                 raise FileNotFoundError("weekly_bets_lite.csv not found")
         except Exception as e:
-            print(f"⚠️ BTTS/OU optimization skipped: {e}")
+            print(f" BTTS/OU optimization skipped: {e}")
             print("   (Continuing with standard predictions)")
     
     run_step(9, "OPTIMIZE BTTS/O/U", step9)
@@ -428,11 +433,11 @@ try:
                 
                 import shutil
                 shutil.copy(output_file, input_file)
-                print("✅ Ensemble weights optimized based on performance")
+                print(" Ensemble weights optimized based on performance")
             else:
                 raise FileNotFoundError("weekly_bets_lite.csv not found")
         except Exception as e:
-            print(f"⚠️ Ensemble blending skipped: {e}")
+            print(f" Ensemble blending skipped: {e}")
             print("   (Continuing with standard blending)")
     
     run_step(10, "SMART ENSEMBLE BLENDING", step10)
@@ -445,7 +450,7 @@ try:
         
         if csv_path.exists():
             log_weekly_predictions(csv_path, week_id)
-            print(f"✅ Logged predictions (Week {week_id})")
+            print(f" Logged predictions (Week {week_id})")
         else:
             raise FileNotFoundError("weekly_bets_lite.csv not found")
     
@@ -458,7 +463,7 @@ try:
         
         if csv_path.exists():
             generate_weighted_top50(csv_path)
-            print("✅ Weighted Top 50 generated")
+            print(" Weighted Top 50 generated")
         else:
             raise FileNotFoundError("weekly_bets_lite.csv not found")
     
@@ -473,12 +478,12 @@ try:
             df_ou = analyze_ou_predictions(min_confidence=0.65)
 
             if not df_ou.empty:
-                print(f"✅ O/U Analysis: {len(df_ou)} predictions")
+                print(f" O/U Analysis: {len(df_ou)} predictions")
                 elite = len(df_ou[df_ou['Best_Prob'] >= 0.85])
                 high = len(df_ou[df_ou['Best_Prob'] >= 0.75])
                 print(f"   Elite (85%+): {elite}, High (75%+): {high}")
             else:
-                print("⚠️ No high-confidence O/U predictions")
+                print(" No high-confidence O/U predictions")
         else:
             raise FileNotFoundError("weekly_bets_lite.csv not found")
     
@@ -509,7 +514,7 @@ try:
                 finder.generate_html_report(accumulators, acca_path)
                 acca_count += 1
             
-            print(f"✅ Generated {acca_count} accumulator strategies")
+            print(f" Generated {acca_count} accumulator strategies")
         else:
             raise FileNotFoundError("weekly_bets_lite.csv not found")
     
@@ -517,7 +522,7 @@ try:
     
     # Step 15: Find Quality Bets (ALL MARKETS)
     def step15():
-        from bet_finder_all_markets import BetFinder
+        from bet_finder import BetFinder
         csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
 
         if csv_path.exists():
@@ -532,9 +537,9 @@ try:
                 # Generate report
                 if finder.quality_bets:
                     finder.generate_report()
-                    print(f"✅ Quality bets report generated: {len(finder.quality_bets)} opportunities found")
+                    print(f" Quality bets report generated: {len(finder.quality_bets)} opportunities found")
                 else:
-                    print("⚠️ No quality bets found with current criteria")
+                    print(" No quality bets found with current criteria")
         else:
             raise FileNotFoundError("weekly_bets_lite.csv not found")
     
@@ -547,9 +552,9 @@ try:
 
         if csv_path.exists():
             log_weekly_predictions(csv_path)
-            print("✅ Predictions logged for accuracy tracking")
+            print(" Predictions logged for accuracy tracking")
         else:
-            print("⚠️ weekly_bets_lite.csv not found, skipping accuracy tracking")
+            print(" weekly_bets_lite.csv not found, skipping accuracy tracking")
     
     run_step(16, "UPDATE ACCURACY DATABASE", step16)
 
@@ -571,7 +576,7 @@ try:
 
             send_weekly_predictions(excel_file, html_report)
 
-            print(f"✅ Excel report generated: {excel_file.name}")
+            print(f" Excel report generated: {excel_file.name}")
         else:
             raise FileNotFoundError("weekly_bets.csv not found")
 
@@ -628,7 +633,7 @@ try:
             shutil.copy2(filepath, dest)
             archived_count += 1
         
-        print(f"✅ Archived {archived_count} files to {archive_dir}")
+        print(f" Archived {archived_count} files to {archive_dir}")
 
     run_step(18, "ARCHIVE OUTPUTS", step18)
     
@@ -637,34 +642,34 @@ try:
     # ========================================================================
     
     print("\n" + "="*60)
-    print("🎉 PIPELINE COMPLETE!")
+    print(" PIPELINE COMPLETE!")
     print("="*60)
     
     # Show any errors that occurred
     if errors:
-        print(f"\n⚠️ {len(errors)} step(s) had errors:")
+        print(f"\n {len(errors)} step(s) had errors:")
         for error in errors:
             print(f"   • {error}")
-        print("\n💡 Check outputs folder - some files may still be generated")
+        print("\n Check outputs folder - some files may still be generated")
     else:
-        print("\n✅ All steps completed successfully!")
+        print("\n All steps completed successfully!")
     
-    print("\n📊 Main Files:")
+    print("\n Main Files:")
     print("   • weekly_bets_lite.csv - All predictions")
     print("   • top50_weighted.html - Top picks (weighted)")
     
-    print("\n⚽ Specialized Reports:")
+    print("\n Specialized Reports:")
     print("   • ou_analysis.html - Over/Under analysis")
     print("   • accumulators_safe.html - Conservative 4-fold")
     print("   • accumulators_mixed.html - Balanced 5-fold")
     print("   • accumulators_aggressive.html - High-risk 6-fold")
     print(f"   • quality_bets_{datetime.datetime.now().strftime('%Y%m%d')}.html - Quality bets (ALL MARKETS)")
     
-    print("\n📈 Tracking:")
+    print("\n Tracking:")
     print("   • accuracy_database.db - Performance database")
     
     print("\n" + "="*60)
-    print("💡 Next Steps:")
+    print(" Next Steps:")
     print("   1. Review top50_weighted.html for best individual bets")
     print("   2. Check quality_bets HTML for opportunities across ALL markets")
     print("   3. Check ou_analysis.html for O/U opportunities")
@@ -688,11 +693,11 @@ try:
         pass
 
 except ImportError as e:
-    print(f"❌ Missing required file: {e}")
-    print("🔧 Ensure all Python files are in the project folder")
-    print("📦 Run: pip install -r requirements.txt")
+    print(f" Missing required file: {e}")
+    print(" Ensure all Python files are in the project folder")
+    print(" Run: pip install -r requirements.txt")
 
 except Exception as e:
-    print(f"❌ Error: {e}")
+    print(f" Error: {e}")
     import traceback
     traceback.print_exc()

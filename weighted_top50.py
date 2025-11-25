@@ -196,8 +196,8 @@ def generate_weighted_top50(csv_path: Path, output_html: Path = None, output_csv
     predictions = resolve_conflicts(predictions)
     print(f"âœ… Resolved conflicts, {len(predictions)} unique matches")
     
-    # Sort by weighted score
-    predictions.sort(key=lambda x: x['weighted_score'], reverse=True)
+    # Sort by Date, League, then weighted score
+    predictions.sort(key=lambda x: (x.get('date', ''), x.get('league', ''), -x['weighted_score']))
     
     # Take top 50
     top50 = predictions[:50]

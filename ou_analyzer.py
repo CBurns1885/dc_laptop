@@ -181,8 +181,9 @@ def generate_ou_report(df_ou: pd.DataFrame, min_confidence: float = DEFAULT_CONF
         _generate_empty_report(min_confidence)
         return
     
-    # Sort by confidence
-    df_ou = df_ou.sort_values('Best_Prob', ascending=False).reset_index(drop=True)
+    # Sort by Date, League, then confidence
+    df_ou['Date'] = pd.to_datetime(df_ou['Date'], errors='coerce')
+    df_ou = df_ou.sort_values(['Date', 'League', 'Best_Prob'], ascending=[True, True, False]).reset_index(drop=True)
     
     # Get historical performance
     historical = get_ou_historical_performance()

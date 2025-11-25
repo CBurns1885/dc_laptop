@@ -91,13 +91,13 @@ class RealisticBacktest:
             if not FEATURES_PARQUET.exists():
                 raise FileNotFoundError("Run build_features(force=True) first")
             
-            print(f"📂 Loading features...")
+            print(f" Loading features...")
             df = pd.read_parquet(FEATURES_PARQUET)
             df['Date'] = pd.to_datetime(df['Date'])
-            print(f"✅ Loaded {len(df)} matches")
+            print(f" Loaded {len(df)} matches")
             return df
         except Exception as e:
-            print(f"❌ Error loading data: {e}")
+            print(f" Error loading data: {e}")
             raise
     
     def backup_existing_outputs(self):
@@ -108,9 +108,9 @@ class RealisticBacktest:
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 backup_path = OUTPUT_DIR / f"weekly_bets_lite_backup_{timestamp}.csv"
                 shutil.copy(weekly_bets_lite, backup_path)
-                print(f"✅ Backed up existing weekly_bets_lite.csv to {backup_path.name}")
+                print(f" Backed up existing weekly_bets_lite.csv to {backup_path.name}")
         except Exception as e:
-            print(f"⚠️ Could not backup weekly_bets_lite.csv: {e}")
+            print(f" Could not backup weekly_bets_lite.csv: {e}")
     
     def get_weekly_periods(self) -> List[Tuple[pd.Timestamp, pd.Timestamp]]:
         """Generate weekly test periods"""
@@ -127,7 +127,7 @@ class RealisticBacktest:
     def train_models(self, train_df: pd.DataFrame) -> bool:
         """Train models on historical data"""
         try:
-            print("   🔧 Preparing training data...")
+            print("    Preparing training data...")
             
             # Fill missing values
             numeric_cols = train_df.select_dtypes(include=[np.number]).columns
@@ -161,13 +161,13 @@ class RealisticBacktest:
                 
                 return success
             except Exception as e:
-                print(f"   ⚠️ Training failed: {e}")
+                print(f"    Training failed: {e}")
                 if backup_features.exists():
                     shutil.copy(backup_features, FEATURES_PARQUET)
                 return False
                 
         except Exception as e:
-            print(f"   ⚠️ Error in training: {e}")
+            print(f"    Error in training: {e}")
             return False
     
     def generate_predictions(self, test_df: pd.DataFrame, week_num: int) -> pd.DataFrame:
@@ -199,16 +199,16 @@ class RealisticBacktest:
                     temp_fixtures.unlink(missing_ok=True)
                     return test_with_preds
                 else:
-                    print("   ⚠️ No predictions generated")
+                    print("    No predictions generated")
                     return test_df
                     
             except Exception as e:
-                print(f"   ⚠️ Prediction error: {e}")
+                print(f"    Prediction error: {e}")
                 temp_fixtures.unlink(missing_ok=True)
                 return test_df
                 
         except Exception as e:
-            print(f"   ⚠️ Error generating predictions: {e}")
+            print(f"    Error generating predictions: {e}")
             return test_df
     
     def find_confident_bets(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -299,7 +299,7 @@ class RealisticBacktest:
     def run_backtest(self):
         """Run realistic backtest"""
         try:
-            print("\n💷 REALISTIC BACKTEST - YOUR BETTING STYLE")
+            print("\n REALISTIC BACKTEST - YOUR BETTING STYLE")
             print("="*60)
             print(f"Period: {self.start_date.date()} to {self.end_date.date()}")
             print(f"Strategy: DOUBLES ONLY")
@@ -316,7 +316,7 @@ class RealisticBacktest:
             ]
             
             periods = self.get_weekly_periods()
-            print(f"\n📅 Testing {len(periods)} weeks\n")
+            print(f"\n Testing {len(periods)} weeks\n")
             
             total_doubles = 0
             total_won = 0
@@ -332,33 +332,33 @@ class RealisticBacktest:
                     test_df = full_df[(full_df['Date'] >= week_start) & (full_df['Date'] < week_end)].copy()
                     
                     if len(train_df) < 100 or len(test_df) == 0:
-                        print(f"   ⚠️ Insufficient data")
+                        print(f"    Insufficient data")
                         continue
                     
-                    print(f"   📊 {len(test_df)} matches this week")
+                    print(f"    {len(test_df)} matches this week")
                     
                     # Train
-                    print(f"   🎯 Training...")
+                    print(f"    Training...")
                     if not self.train_models(train_df):
-                        print(f"   ❌ Training failed")
+                        print(f"    Training failed")
                         continue
                     
                     # Predict
-                    print(f"   🔮 Predicting...")
+                    print(f"    Predicting...")
                     test_with_preds = self.generate_predictions(test_df, i)
                     
                     # Find confident bets
                     confident_bets = self.find_confident_bets(test_with_preds)
                     
                     if len(confident_bets) < 2:
-                        print(f"   ℹ️ Not enough confident bets ({len(confident_bets)})")
+                        print(f"   ℹ Not enough confident bets ({len(confident_bets)})")
                         continue
                     
                     # Build doubles
                     week_doubles = self.build_doubles(confident_bets)
                     
                     if not week_doubles:
-                        print(f"   ℹ️ No valid doubles")
+                        print(f"   ℹ No valid doubles")
                         continue
                     
                     # Stats for this week
@@ -371,7 +371,7 @@ class RealisticBacktest:
                     total_staked += week_staked
                     total_returns += sum(d['Stake'] * d['Combined_Odds'] for d in week_doubles if d['Won'])
                     
-                    print(f"   💷 {len(week_doubles)} doubles | {week_won} won | £{week_profit:+.2f}")
+                    print(f"    {len(week_doubles)} doubles | {week_won} won | £{week_profit:+.2f}")
                     
                     self.all_doubles.extend(week_doubles)
                     
@@ -384,7 +384,7 @@ class RealisticBacktest:
                     })
                     
                 except Exception as e:
-                    print(f"   ⚠️ Error in week {i}: {e}")
+                    print(f"    Error in week {i}: {e}")
                     continue
             
             # Generate summary
@@ -393,24 +393,24 @@ class RealisticBacktest:
             self.restore_outputs()
             
         except Exception as e:
-            print(f"❌ Backtest error: {e}")
+            print(f" Backtest error: {e}")
             self.restore_outputs()
     
     def print_summary(self, total_doubles, total_won, total_staked, total_returns):
         """Print final results"""
         print("\n" + "="*60)
-        print("📊 BACKTEST RESULTS")
+        print(" BACKTEST RESULTS")
         print("="*60)
         
         if total_doubles == 0:
-            print("❌ No doubles placed")
+            print(" No doubles placed")
             return
         
         hit_rate = (total_won / total_doubles) * 100
         total_profit = total_returns - total_staked
         roi = (total_profit / total_staked) * 100 if total_staked > 0 else 0
         
-        print(f"\n💷 FINANCIAL SUMMARY:")
+        print(f"\n FINANCIAL SUMMARY:")
         print(f"   Total Doubles: {total_doubles}")
         print(f"   Won: {total_won} ({hit_rate:.1f}%)")
         print(f"   Total Staked: £{total_staked:.2f}")
@@ -419,13 +419,13 @@ class RealisticBacktest:
         print(f"   ROI: {roi:+.1f}%")
         
         # Profitability assessment
-        print(f"\n📈 VERDICT:")
+        print(f"\n VERDICT:")
         if total_profit > 0:
-            print(f"   ✅ PROFITABLE - Would have made £{total_profit:.2f}")
-            print(f"   ✅ Average profit per week: £{total_profit/len(self.weekly_results):.2f}")
+            print(f"    PROFITABLE - Would have made £{total_profit:.2f}")
+            print(f"    Average profit per week: £{total_profit/len(self.weekly_results):.2f}")
         else:
-            print(f"   ❌ LOSING - Would have lost £{abs(total_profit):.2f}")
-            print(f"   ⚠️ Strategy needs adjustment")
+            print(f"    LOSING - Would have lost £{abs(total_profit):.2f}")
+            print(f"    Strategy needs adjustment")
         
         # Best doubles
         if self.all_doubles:
@@ -433,7 +433,7 @@ class RealisticBacktest:
             won_doubles = doubles_df[doubles_df['Won']]
             
             if len(won_doubles) > 0:
-                print(f"\n🏆 BEST WINNING DOUBLES:")
+                print(f"\n BEST WINNING DOUBLES:")
                 best = won_doubles.nlargest(5, 'Profit')
                 for idx, row in best.iterrows():
                     print(f"   • {row['Date'].date()} - {row['Combined_Odds']} odds - £{row['Profit']:.2f} profit")
@@ -449,21 +449,21 @@ class RealisticBacktest:
                 doubles_df = pd.DataFrame(self.all_doubles)
                 output_path = self.backtest_dir / "realistic_doubles.csv"
                 doubles_df.to_csv(output_path, index=False)
-                print(f"✅ Saved: {output_path}")
+                print(f" Saved: {output_path}")
             
             if self.weekly_results:
                 weekly_df = pd.DataFrame(self.weekly_results)
                 output_path = self.backtest_dir / "realistic_weekly.csv"
                 weekly_df.to_csv(output_path, index=False)
-                print(f"✅ Saved: {output_path}")
+                print(f" Saved: {output_path}")
                 
         except Exception as e:
-            print(f"⚠️ Error saving results: {e}")
+            print(f" Error saving results: {e}")
     
     def restore_outputs(self):
         """Clean up backtest temporary files"""
         try:
-            print(f"\n🧹 Cleaning up...")
+            print(f"\n Cleaning up...")
             
             # Remove weekly_bets_lite.csv created during backtest
             weekly_bets_lite = OUTPUT_DIR / "weekly_bets_lite.csv"
@@ -476,15 +476,15 @@ class RealisticBacktest:
                 
                 if latest_backup:
                     shutil.copy(latest_backup, weekly_bets_lite)
-                    print(f"✅ Restored original weekly_bets_lite.csv from backup")
+                    print(f" Restored original weekly_bets_lite.csv from backup")
                 else:
                     weekly_bets_lite.unlink()
-                    print(f"✅ Removed backtest weekly_bets_lite.csv")
+                    print(f" Removed backtest weekly_bets_lite.csv")
             
-            print(f"✅ All backtest files saved to: {self.backtest_dir}")
+            print(f" All backtest files saved to: {self.backtest_dir}")
             
         except Exception as e:
-            print(f"⚠️ Error during cleanup: {e}")
+            print(f" Error during cleanup: {e}")
 
 
 # ============================================================================
@@ -495,7 +495,7 @@ if __name__ == "__main__":
     from datetime import datetime
     
     try:
-        print("\n⚽ REALISTIC BACKTEST - YOUR BETTING STYLE")
+        print("\n REALISTIC BACKTEST - YOUR BETTING STYLE")
         print("="*60)
         print("Default Stakes (adjust below if needed):")
         print("  • Over 0.5: £20 (safest)")
@@ -531,15 +531,15 @@ if __name__ == "__main__":
         
         backtest.run_backtest()
         
-        print("\n✅ COMPLETE!")
-        print("📂 All backtest files saved to: outputs/backtest_outputs/")
+        print("\n COMPLETE!")
+        print(" All backtest files saved to: outputs/backtest_outputs/")
         print("   • realistic_doubles.csv - All doubles placed")
         print("   • realistic_weekly.csv - Week-by-week profit")
         print("   • predictions_week_X.csv - Predictions for each week")
-        print("\n✅ Your original weekly_bets_lite.csv was preserved!")
+        print("\n Your original weekly_bets_lite.csv was preserved!")
         
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n Error: {e}")
         import traceback
         traceback.print_exc()
     

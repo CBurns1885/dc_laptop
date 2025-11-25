@@ -58,7 +58,7 @@ class EmailSender:
             True if sent successfully, False otherwise
         """
         if not self.is_configured():
-            print("❌ Email not configured")
+            print(" Email not configured")
             print("   Set these environment variables:")
             print("   - EMAIL_SMTP_SERVER")
             print("   - EMAIL_SMTP_PORT")
@@ -71,7 +71,7 @@ class EmailSender:
             # Generate default subject/body if not provided
             if subject is None:
                 date_str = datetime.now().strftime('%A, %d %B %Y')
-                subject = f"⚽ Football Predictions - {date_str}"
+                subject = f" Football Predictions - {date_str}"
 
             if body is None:
                 body = self._generate_email_body(excel_file)
@@ -95,22 +95,22 @@ class EmailSender:
                         self._attach_file(msg, file_path)
 
             # Send email
-            print(f"\n📧 Sending email to {self.recipient}...")
+            print(f"\n Sending email to {self.recipient}...")
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.sender, self.password)
                 server.send_message(msg)
 
-            print(f"✅ Email sent successfully!")
-            print(f"   📎 Attached: {excel_file.name}")
+            print(f" Email sent successfully!")
+            print(f"    Attached: {excel_file.name}")
             if additional_files:
                 for f in additional_files:
-                    print(f"   📎 Attached: {f.name}")
+                    print(f"    Attached: {f.name}")
 
             return True
 
         except Exception as e:
-            print(f"❌ Failed to send email: {e}")
+            print(f" Failed to send email: {e}")
             return False
 
     def _attach_file(self, msg: MIMEMultipart, file_path: Path):
@@ -178,23 +178,23 @@ class EmailSender:
                     padding: 8px 0;
                 }}
                 li:before {{
-                    content: "⚽ ";
+                    content: " ";
                 }}
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>⚽ Football Predictions</h1>
+                    <h1> Football Predictions</h1>
                     <p>{date_str}</p>
                 </div>
                 <div class="content">
-                    <p>Hi there! 👋</p>
+                    <p>Hi there! </p>
 
                     <p>Your weekly football predictions are ready!</p>
 
                     <div class="highlight">
-                        <h3>📊 What's Included:</h3>
+                        <h3> What's Included:</h3>
                         <ul>
                             <li><strong>Top 10 All Markets</strong> - Best picks across all markets</li>
                             <li><strong>BTTS Predictions</strong> - Both Teams To Score analysis</li>
@@ -203,7 +203,7 @@ class EmailSender:
                     </div>
 
                     <div class="highlight">
-                        <h3>🎯 System Features:</h3>
+                        <h3> System Features:</h3>
                         <ul>
                             <li>Dixon-Coles statistical model</li>
                             <li>Rest days analysis (fixture congestion)</li>
@@ -212,9 +212,9 @@ class EmailSender:
                         </ul>
                     </div>
 
-                    <p><strong>📎 Attachment:</strong> {excel_file.name}</p>
+                    <p><strong> Attachment:</strong> {excel_file.name}</p>
 
-                    <p>Good luck! 🍀</p>
+                    <p>Good luck! </p>
 
                     <div class="footer">
                         <p>Automated prediction system powered by Dixon-Coles</p>
@@ -243,7 +243,7 @@ def send_weekly_predictions(excel_file: Path, html_report: Optional[Path] = None
     sender = EmailSender()
 
     if not sender.is_configured():
-        print("\n💡 TIP: Configure email sending by setting environment variables")
+        print("\n TIP: Configure email sending by setting environment variables")
         print("   in run_weekly.py or your shell profile (.bashrc, .zshrc)")
         return False
 
@@ -260,12 +260,12 @@ if __name__ == "__main__":
     sender = EmailSender()
 
     if sender.is_configured():
-        print("✅ Email is configured")
+        print(" Email is configured")
         print(f"   Server: {sender.smtp_server}:{sender.smtp_port}")
         print(f"   Sender: {sender.sender}")
         print(f"   Recipient: {sender.recipient}")
     else:
-        print("❌ Email is not configured")
+        print(" Email is not configured")
         print("\nSet these environment variables:")
         print("   export EMAIL_SMTP_SERVER='smtp-mail.outlook.com'")
         print("   export EMAIL_SMTP_PORT='587'")

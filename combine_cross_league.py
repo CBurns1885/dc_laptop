@@ -31,17 +31,17 @@ def combine_predictions(input_csv: str, output_csv: str = None) -> Path:
     """
     
     print("="*70)
-    print("🔗 CROSS-LEAGUE PREDICTION COMBINER")
+    print(" CROSS-LEAGUE PREDICTION COMBINER")
     print("="*70)
     
     # Load predictions
     input_path = Path(input_csv)
     if not input_path.exists():
-        print(f"❌ Error: File not found: {input_path}")
+        print(f" Error: File not found: {input_path}")
         return None
     
     df = pd.read_csv(input_path)
-    print(f"\n📂 Loaded: {input_path}")
+    print(f"\n Loaded: {input_path}")
     print(f"   Total predictions: {len(df)}")
     
     # Identify duplicates (same Date, HomeTeam, AwayTeam)
@@ -51,15 +51,15 @@ def combine_predictions(input_csv: str, output_csv: str = None) -> Path:
     num_duplicates = duplicate_mask.sum()
     num_unique_matches = df[duplicate_mask]['_match_key'].nunique()
     
-    print(f"\n🔍 Found {num_duplicates} rows from {num_unique_matches} cross-league matches")
+    print(f"\n Found {num_duplicates} rows from {num_unique_matches} cross-league matches")
     
     if num_unique_matches == 0:
-        print("\n✅ No cross-league matches found - all predictions are single-league")
+        print("\n No cross-league matches found - all predictions are single-league")
         print(f"   Output: {input_path} (unchanged)")
         return input_path
     
     # Show which matches will be combined
-    print("\n📊 Cross-league matches to combine:")
+    print("\n Cross-league matches to combine:")
     for match_key in df[duplicate_mask]['_match_key'].unique():
         match_rows = df[df['_match_key'] == match_key]
         leagues = match_rows['League'].tolist()
@@ -128,14 +128,14 @@ def combine_predictions(input_csv: str, output_csv: str = None) -> Path:
     combined_df.to_csv(output_path, index=False)
     
     # Summary
-    print(f"\n✅ Combined predictions saved: {output_path}")
+    print(f"\n Combined predictions saved: {output_path}")
     print(f"   Original rows: {len(df)}")
     print(f"   Combined rows: {len(combined_df)}")
     print(f"   Reduced by: {len(df) - len(combined_df)} rows")
     
     # Show example of combined prediction
     if num_unique_matches > 0:
-        print("\n📋 Example combined prediction:")
+        print("\n Example combined prediction:")
         combined_match = combined_df[combined_df['League'].str.contains('COMBINED', na=False)].iloc[0]
         print(f"   Match: {combined_match.get('HomeTeam', 'N/A')} vs {combined_match.get('AwayTeam', 'N/A')}")
         print(f"   League: {combined_match.get('League', 'N/A')}")
@@ -174,11 +174,11 @@ def main():
     result = combine_predictions(args.input, args.output)
     
     if result:
-        print(f"\n✅ Success! Use this file for your bets:")
+        print(f"\n Success! Use this file for your bets:")
         print(f"   {result}")
         return 0
     else:
-        print("\n❌ Failed to combine predictions")
+        print("\n Failed to combine predictions")
         return 1
 
 

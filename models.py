@@ -108,7 +108,7 @@ def train_all_targets(models_dir: Path = MODEL_ARTIFACTS_DIR) -> Dict[str, Train
                 mode_val = df[col].mode()
                 df[col] = df[col].fillna(mode_val[0] if len(mode_val) > 0 else 'Unknown')
     
-    print(f"✅ NaN values handled")
+    print(f" NaN values handled")
     
     # Continue with rest of function...
     models: Dict[str, TrainedTarget] = {}
@@ -475,7 +475,7 @@ def _fit_single_target(df: pd.DataFrame, target_col: str) -> TrainedTarget:
     if sub.empty:
         raise RuntimeError(f"No data for target {target_col}")
     if df[target_col].isna().all():
-        print(f"⚠️ Skipping {target_col} - no data available")
+        print(f" Skipping {target_col} - no data available")
         return None
     
     error_count = 0
@@ -489,26 +489,36 @@ def _fit_single_target(df: pd.DataFrame, target_col: str) -> TrainedTarget:
     min_class_count = class_counts.min()
     
     if min_class_count < 5:
-        print(f"⚠️ Skipping {target_col} - class has only {min_class_count} sample(s), need minimum 5 for CV")
+        print(f" Skipping {target_col} - class has only {min_class_count} sample(s), need minimum 5 for CV")
         return None
     
     if len(classes) > 50:
-        print(f"⚠️ Skipping {target_col} - too many classes ({len(classes)}), max 50 supported")
+        print(f" Skipping {target_col} - too many classes ({len(classes)}), max 50 supported")
         return None
     pre = _preprocessor(sub)
     X_all = pre.fit_transform(sub)
     feature_names = [*(pre.transformers_[0][2] or []), *(pre.transformers_[1][2] or [])]
+    
+    # IMPORTANT: Preprocessor may drop rows - align all arrays
+    if X_all.shape[0] != len(y_int):
+        print(f"   WARNING: Preprocessor dropped {len(y_int) - X_all.shape[0]} rows")
+        # Get valid indices (rows not dropped by preprocessor)
+        valid_idx = sub.index[:X_all.shape[0]]
+        sub = sub.loc[valid_idx].reset_index(drop=True)
+        y = sub[target_col].astype("category")
+        classes = list(y.cat.categories)
+        y_int = y.cat.codes.values
 
     # ===== DIXON-COLES ONLY =====
     # For DC-only BTTS and O/U implementation, we only use the DC model
-    print(f"  ⚽ Using Dixon-Coles model ONLY (no ensemble)")
+    print(f"   Using Dixon-Coles model ONLY (no ensemble)")
 
     base_models = {}
     supports_dc = _dc_supported(target_col)
     if supports_dc:
         base_models["dc"] = "__DC__"
     else:
-        print(f"  ⚠️ Target {target_col} not supported by DC model")
+        print(f"   Target {target_col} not supported by DC model")
         return None
 
     # Walk-forward OOF
@@ -522,7 +532,7 @@ def _fit_single_target(df: pd.DataFrame, target_col: str) -> TrainedTarget:
         fold_stack = []
         for name, model in base_models.items():
             if name == "dc":
-                proba = _dc_probs_for_rows(sub.iloc[tr], sub.iloc[va], target_col)
+                proba = _dc_probs_for_rows(sub[tr].reset_index(drop=True), sub[va].reset_index(drop=True), target_col)
             else:
                 m = model
                 # Fit fresh copy per fold to keep OOF strict
@@ -627,22 +637,35 @@ def train_all_targets(models_dir: Path = MODEL_ARTIFACTS_DIR) -> Dict[str, Train
     targets = [t for t in _all_targets() if t in df.columns]
     start_time = time.time()
 
+    print(f"\n{'='*60}")
+    print(f"Training {len(targets)} targets on {len(df)} matches")
+    print(f"{'='*60}\n")
+
     for i, t in enumerate(targets, 1):
+        target_start = time.time()
         log_header(f"TRAIN {t} ({i}/{len(targets)})")
         sub = df.dropna(subset=[t])
         if sub.empty:
+            print(f"   SKIPPED - No data")
             continue
-        trg = _fit_single_target(df, t)
+
+        print(f"   Training on {len(sub)} matches...")
+        trg = _fit_single_target(sub, t)
         if trg is None:
+            print(f"   SKIPPED - Model returned None")
             continue
+
+        target_elapsed = time.time() - target_start
+        print(f"   Saving model... ({target_elapsed:.1f}s)")
         joblib.dump(trg, models_dir / f"{t}.joblib", compress=3)
         models[t] = trg
-        
-        # Time estimate
+
+        # Progress and time estimate
         elapsed = time.time() - start_time
         avg_per_target = elapsed / i
         remaining = avg_per_target * (len(targets) - i)
-        print(f"⏱️ Est. {remaining/3600:.1f}h remaining ({i}/{len(targets)} done)")
+        pct = (i / len(targets)) * 100
+        print(f"   [{pct:.0f}%] Completed in {target_elapsed:.1f}s | Remaining: {remaining/60:.1f}min ({i}/{len(targets)} done)\n")
     
     # save manifest
     with open(models_dir / "manifest.json", "w") as f:

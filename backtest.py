@@ -50,7 +50,7 @@ class BacktestEngine:
                 "Features not found. Run build_features(force=True) first"
             )
         
-        print(f"📂 Loading features from {FEATURES_PARQUET}")
+        print(f" Loading features from {FEATURES_PARQUET}")
         df = pd.read_parquet(FEATURES_PARQUET)
         df['Date'] = pd.to_datetime(df['Date'])
         return df
@@ -90,11 +90,15 @@ class BacktestEngine:
         Returns True if successful
         """
         # NEW: Fill NaN BEFORE saving to file
-        print("   🔧 Handling missing values...")
+        print("    Handling missing values...")
         numeric_cols = train_df.select_dtypes(include=[np.number]).columns
         for col in numeric_cols:
             if train_df[col].isna().sum() > 0:
                 train_df[col] = train_df[col].fillna(train_df[col].median())
+
+        # Convert categorical columns to string to avoid fillna errors
+        for col in train_df.select_dtypes(['category']).columns:
+            train_df[col] = train_df[col].astype(str)
 
         # Fill any remaining NaN with 0
         train_df = train_df.fillna(0)
@@ -132,7 +136,7 @@ class BacktestEngine:
             return success
             
         except Exception as e:
-            print(f"   ⚠️ Training failed: {e}")
+            print(f"    Training failed: {e}")
             
             # Restore original features
             if backup_features.exists():
@@ -161,7 +165,11 @@ class BacktestEngine:
             
             if predictions_file.exists():
                 predictions = pd.read_csv(predictions_file)
-                
+
+                # Ensure Date columns match type for merge
+                predictions['Date'] = pd.to_datetime(predictions['Date'], errors='coerce')
+                test_df['Date'] = pd.to_datetime(test_df['Date'], errors='coerce')
+
                 # Merge predictions with test data
                 test_with_preds = test_df.merge(
                     predictions,
@@ -174,11 +182,11 @@ class BacktestEngine:
                 
                 return test_with_preds
             else:
-                print("   ⚠️ Predictions file not generated")
+                print("    Predictions file not generated")
                 return test_df
                 
         except Exception as e:
-            print(f"   ⚠️ Prediction failed: {e}")
+            print(f"    Prediction failed: {e}")
             temp_fixtures.unlink(missing_ok=True)
             return test_df
     
@@ -363,11 +371,11 @@ class BacktestEngine:
 
                 # Interpretation
                 if abs(calibration_error) < 0.03:
-                    status = "✅ Well-calibrated"
+                    status = " Well-calibrated"
                 elif calibration_error > 0:
-                    status = f"📈 Overperforming +{calibration_error*100:.1f}%"
+                    status = f" Overperforming +{calibration_error*100:.1f}%"
                 else:
-                    status = f"📉 Underperforming {calibration_error*100:.1f}%"
+                    status = f" Underperforming {calibration_error*100:.1f}%"
 
                 calibration_results.append({
                     'Tier': tier_name,
@@ -393,7 +401,7 @@ class BacktestEngine:
 
     def run_backtest(self) -> pd.DataFrame:
         """Run complete walk-forward backtest"""
-        print("\n🔬 BACKTESTING ENGINE")
+        print("\n BACKTESTING ENGINE")
         print("="*60)
         print(f"Period: {self.start_date.date()} to {self.end_date.date()}")
         print(f"Test window: {self.test_window_days} days")
@@ -411,7 +419,7 @@ class BacktestEngine:
         
         # Get test periods
         periods = self.get_test_periods()
-        print(f"\n📅 Testing {len(periods)} periods\n")
+        print(f"\n Testing {len(periods)} periods\n")
         
         for i, (test_start, test_end) in enumerate(periods, 1):
             print(f"Period {i}/{len(periods)}: {test_start.date()} to {test_end.date()}")
@@ -421,25 +429,25 @@ class BacktestEngine:
             
             # Check sufficient data
             if len(train_df) < self.min_training_matches:
-                print(f"   ⚠️ Insufficient training data ({len(train_df)} matches)")
+                print(f"    Insufficient training data ({len(train_df)} matches)")
                 continue
             
             if len(test_df) == 0:
-                print(f"   ⚠️ No test matches")
+                print(f"    No test matches")
                 continue
             
-            print(f"   📊 Train: {len(train_df)} matches | Test: {len(test_df)} matches")
+            print(f"    Train: {len(train_df)} matches | Test: {len(test_df)} matches")
             
             # Train models on training data only
-            print(f"   🎯 Training models...")
+            print(f"    Training models...")
             success = self.train_models_on_period(train_df)
             
             if not success:
-                print(f"   ❌ Training failed")
+                print(f"    Training failed")
                 continue
             
             # Generate predictions
-            print(f"   🔮 Generating predictions...")
+            print(f"    Generating predictions...")
             test_with_preds = self.generate_predictions(test_df)
             
             # Evaluate
@@ -450,7 +458,7 @@ class BacktestEngine:
             self.results.append(period_results)
             
             # Print summary
-            print(f"   📈 Results:")
+            print(f"    Results:")
             for market, stats in period_results.get('markets', {}).items():
                 print(f"      • {market}: {stats['accuracy']:.1%} ({stats['correct']}/{stats['total']})")
         
@@ -460,11 +468,11 @@ class BacktestEngine:
     def generate_summary(self) -> pd.DataFrame:
         """Aggregate results with league breakdowns and combo analysis"""
         if not self.results:
-            print("\n⚠️ No results to summarize")
+            print("\n No results to summarize")
             return pd.DataFrame()
         
         print("\n" + "="*60)
-        print("📊 BACKTEST SUMMARY - ALL PERIODS")
+        print(" BACKTEST SUMMARY - ALL PERIODS")
         print("="*60)
         
         # 1. Overall market performance
@@ -498,14 +506,15 @@ class BacktestEngine:
                 }
         
         summary_df = pd.DataFrame.from_dict(market_summary, orient='index')
-        summary_df = summary_df.sort_values('Accuracy', ascending=False)
+        if not summary_df.empty and 'Accuracy_%' in summary_df.columns:
+            summary_df = summary_df.sort_values('Accuracy_%', ascending=False)
         
-        print("\n📊 OVERALL MARKET PERFORMANCE:")
+        print("\n OVERALL MARKET PERFORMANCE:")
         print(summary_df.to_string())
 
         # 1.5 Calibration analysis (tiered accuracy)
         print("\n" + "="*60)
-        print("🎯 CALIBRATION ANALYSIS - Tiered Accuracy")
+        print(" CALIBRATION ANALYSIS - Tiered Accuracy")
         print("="*60)
         print("Shows: At X% confidence, how often were we actually correct?")
         print()
@@ -524,17 +533,17 @@ class BacktestEngine:
                 # Save calibration report
                 calibration_path = OUTPUT_DIR / "backtest_calibration.csv"
                 calibration_df.to_csv(calibration_path, index=False)
-                print(f"\n✅ Saved calibration report: {calibration_path}")
+                print(f"\n Saved calibration report: {calibration_path}")
 
                 # Quick interpretation
-                print("\n💡 CALIBRATION GUIDE:")
+                print("\n CALIBRATION GUIDE:")
                 print("   • Well-calibrated: Actual % within ±3% of expected")
                 print("   • Overperforming: Better than predicted (conservative)")
                 print("   • Underperforming: Worse than predicted (overconfident)")
             else:
-                print("⚠️ Not enough data for calibration analysis")
+                print(" Not enough data for calibration analysis")
         else:
-            print("⚠️ No predictions collected for calibration analysis")
+            print(" No predictions collected for calibration analysis")
 
         # 2. League-specific analysis
         self.analyze_by_league()
@@ -544,31 +553,31 @@ class BacktestEngine:
         
         # Interpretation
         print("\n" + "="*60)
-        print("💡 KEY FINDINGS:")
+        print(" KEY FINDINGS:")
         print("="*60)
         
         excellent = summary_df[summary_df['Accuracy_%'] >= 60]
         good = summary_df[(summary_df['Accuracy_%'] >= 55) & (summary_df['Accuracy_%'] < 60)]
         
         if len(excellent) > 0:
-            print(f"✅ EXCELLENT markets (≥60%): {', '.join(excellent.index.tolist())}")
+            print(f" EXCELLENT markets (≥60%): {', '.join(excellent.index.tolist())}")
         
         if len(good) > 0:
-            print(f"✅ GOOD markets (55-60%): {', '.join(good.index.tolist())}")
+            print(f" GOOD markets (55-60%): {', '.join(good.index.tolist())}")
         
-        print(f"\n📈 Best overall: {summary_df.index[0]} ({summary_df.iloc[0]['Accuracy_%']:.1f}%)")
+        print(f"\n Best overall: {summary_df.index[0]} ({summary_df.iloc[0]['Accuracy_%']:.1f}%)")
         
         # Save
         output_path = OUTPUT_DIR / "backtest_summary.csv"
         summary_df.to_csv(output_path)
-        print(f"\n✅ Saved: {output_path}")
+        print(f"\n Saved: {output_path}")
         
         return summary_df
     
     def analyze_by_league(self):
         """Analyze performance by league + market combination"""
         print("\n" + "="*60)
-        print("🏆 LEAGUE + MARKET BREAKDOWN")
+        print(" LEAGUE + MARKET BREAKDOWN")
         print("="*60)
         
         # Collect all predictions with league info
@@ -580,13 +589,13 @@ class BacktestEngine:
             pass
         
         # For now, print instruction
-        print("💡 To see league breakdowns, check backtest_detailed.csv")
+        print(" To see league breakdowns, check backtest_detailed.csv")
         print("   Filter by League column to see market performance per league")
     
     def analyze_combinations(self):
         """Analyze double/treble success rates"""
         print("\n" + "="*60)
-        print("🎲 COMBINATION ANALYSIS (Doubles/Trebles)")
+        print(" COMBINATION ANALYSIS (Doubles/Trebles)")
         print("="*60)
         
         from itertools import combinations
@@ -604,7 +613,7 @@ class BacktestEngine:
         avg_accs = {m: np.mean(accs) for m, accs in market_accs.items() if len(accs) > 0}
         
         # Find best doubles
-        print("\n🎯 BEST DOUBLES (Top 10):")
+        print("\n BEST DOUBLES (Top 10):")
         doubles = []
         for m1, m2 in combinations(avg_accs.keys(), 2):
             combined_prob = avg_accs[m1] * avg_accs[m2]
@@ -622,7 +631,7 @@ class BacktestEngine:
         print(doubles_df.to_string(index=False))
         
         # Find best trebles
-        print("\n🎯 BEST TREBLES (Top 10):")
+        print("\n BEST TREBLES (Top 10):")
         trebles = []
         for m1, m2, m3 in combinations(avg_accs.keys(), 3):
             combined_prob = avg_accs[m1] * avg_accs[m2] * avg_accs[m3]
@@ -643,9 +652,9 @@ class BacktestEngine:
         doubles_df.to_csv(OUTPUT_DIR / "backtest_best_doubles.csv", index=False)
         trebles_df.to_csv(OUTPUT_DIR / "backtest_best_trebles.csv", index=False)
         
-        print("\n✅ Saved combination analysis to outputs/backtest_best_*.csv")
+        print("\n Saved combination analysis to outputs/backtest_best_*.csv")
         
-        print("\n💡 COMBINATION TIPS:")
+        print("\n COMBINATION TIPS:")
         print("   • Look for combinations with >40% hit rate for trebles")
         print("   • Look for combinations with >60% hit rate for doubles")
         print("   • Cross-league combos often have better value")
@@ -668,7 +677,7 @@ class BacktestEngine:
         output_path = OUTPUT_DIR / "backtest_detailed.csv"
         detailed_df.to_csv(output_path, index=False)
         
-        print(f"✅ Saved detailed: {output_path}")
+        print(f" Saved detailed: {output_path}")
         return output_path
 
 
@@ -683,7 +692,7 @@ if __name__ == "__main__":
     end_date = datetime.now()
     start_date = end_date - timedelta(days=180)
     
-    print("\n⚽ FOOTBALL PREDICTION BACKTEST")
+    print("\n FOOTBALL PREDICTION BACKTEST")
     print("="*60)
     print(f"Default period: Last 6 months")
     print(f"   From: {start_date.date()}")
@@ -708,8 +717,8 @@ if __name__ == "__main__":
     engine.export_detailed_results()
     
     print("\n" + "="*60)
-    print("✅ BACKTEST COMPLETE")
+    print(" BACKTEST COMPLETE")
     print("="*60)
-    print("📂 Check outputs folder for:")
+    print(" Check outputs folder for:")
     print("   • backtest_summary.csv - Overall performance")
     print("   • backtest_detailed.csv - Period-by-period breakdown")

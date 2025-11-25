@@ -26,7 +26,7 @@ class StatsGenerator:
     
     def load_historical_data(self):
         """Load all historical CSV files"""
-        print("📂 Loading historical data...")
+        print(" Loading historical data...")
         
         csv_files = list(self.data_dir.glob("*.csv"))
         if not csv_files:
@@ -41,14 +41,14 @@ class StatsGenerator:
                     df['League'] = df['Div']
                 all_data.append(df)
             except Exception as e:
-                print(f"   ⚠️ Skipping {csv_file.name}: {e}")
+                print(f"    Skipping {csv_file.name}: {e}")
         
         self.df = pd.concat(all_data, ignore_index=True)
-        print(f"✅ Loaded {len(self.df)} matches from {len(csv_files)} files")
+        print(f" Loaded {len(self.df)} matches from {len(csv_files)} files")
     
     def calculate_team_stats(self):
         """Calculate per-team statistics"""
-        print("📊 Calculating team statistics...")
+        print(" Calculating team statistics...")
         
         teams = set(self.df['HomeTeam'].unique()) | set(self.df['AwayTeam'].unique())
         
@@ -87,14 +87,14 @@ class StatsGenerator:
                 'away_goals_against_per_game': away_matches['FTHG'].mean() if away_total > 0 else 0
             }
         
-        print(f"✅ Calculated stats for {len(self.team_stats)} teams")
+        print(f" Calculated stats for {len(self.team_stats)} teams")
     
     def calculate_referee_stats(self):
         """Calculate per-referee statistics"""
-        print("🟨 Calculating referee statistics...")
+        print(" Calculating referee statistics...")
         
         if 'Referee' not in self.df.columns:
-            print("⚠️ No Referee column found, skipping")
+            print(" No Referee column found, skipping")
             return
         
         referees = self.df['Referee'].dropna().unique()
@@ -133,7 +133,7 @@ class StatsGenerator:
                 'reds_per_match': total_reds / total if total > 0 else 0
             }
         
-        print(f"✅ Calculated stats for {len(self.referee_stats)} referees")
+        print(f" Calculated stats for {len(self.referee_stats)} referees")
     
     def export_to_csv(self, output_dir: Path):
         """Export stats to CSV files"""
@@ -145,7 +145,7 @@ class StatsGenerator:
             team_df.index.name = 'Team'
             team_path = output_dir / 'team_statistics.csv'
             team_df.to_csv(team_path)
-            print(f"✅ Exported: {team_path}")
+            print(f" Exported: {team_path}")
         
         # Referee stats
         if self.referee_stats:
@@ -153,7 +153,7 @@ class StatsGenerator:
             ref_df.index.name = 'Referee'
             ref_path = output_dir / 'referee_statistics.csv'
             ref_df.to_csv(ref_path)
-            print(f"✅ Exported: {ref_path}")
+            print(f" Exported: {ref_path}")
     
     def generate_all(self, output_dir: Path):
         """Run full generation pipeline"""
@@ -185,16 +185,16 @@ class StatsLoader:
         if team_file.exists():
             df = pd.read_csv(team_file, index_col=0)
             self.team_stats = df.to_dict('index')
-            print(f"✅ Loaded {len(self.team_stats)} team stats")
+            print(f" Loaded {len(self.team_stats)} team stats")
         else:
-            print(f"⚠️ Team stats not found: {team_file}")
+            print(f" Team stats not found: {team_file}")
         
         if ref_file.exists():
             df = pd.read_csv(ref_file, index_col=0)
             self.referee_stats = df.to_dict('index')
-            print(f"✅ Loaded {len(self.referee_stats)} referee stats")
+            print(f" Loaded {len(self.referee_stats)} referee stats")
         else:
-            print(f"⚠️ Referee stats not found: {ref_file}")
+            print(f" Referee stats not found: {ref_file}")
     
     def get_team_features(self, team_name: str, venue: str) -> Dict[str, float]:
         """
@@ -276,16 +276,16 @@ def generate_statistics(data_dir: Path = Path("downloaded_data"),
     Generate team_statistics.csv and referee_statistics.csv from historical data
     Call this in RUN_WEEKLY.py before building features
     """
-    print("\n🏟️ GENERATING TEAM & REFEREE STATISTICS")
+    print("\n GENERATING TEAM & REFEREE STATISTICS")
     print("="*45)
     
     try:
         generator = StatsGenerator(data_dir)
         generator.generate_all(output_dir)
-        print("✅ Statistics generation complete\n")
+        print(" Statistics generation complete\n")
         return True
     except Exception as e:
-        print(f"❌ Error generating statistics: {e}")
+        print(f" Error generating statistics: {e}")
         return False
 
 
@@ -295,11 +295,11 @@ def add_stats_features(features_df: pd.DataFrame,
     Add team/referee stats to existing features dataframe
     Call this in features.py after building base features
     """
-    print("📊 Adding team/referee statistics features...")
+    print(" Adding team/referee statistics features...")
     loader = StatsLoader(stats_dir)
     enhanced = loader.add_to_dataframe(features_df)
     new_cols = len(enhanced.columns) - len(features_df.columns)
-    print(f"✅ Added {new_cols} statistical feature columns")
+    print(f" Added {new_cols} statistical feature columns")
     return enhanced
 
 
@@ -331,7 +331,7 @@ if __name__ == "__main__":
     success = generate_statistics()
     
     if success:
-        print("\n✅ Statistics generated successfully!")
+        print("\n Statistics generated successfully!")
         print("   Files created in: outputs/statistics/")
         print("   - team_statistics.csv")
         print("   - referee_statistics.csv")
@@ -345,6 +345,6 @@ if __name__ == "__main__":
         })
         
         enhanced = add_stats_features(test_df)
-        print(f"\n✅ Feature columns: {list(enhanced.columns)}")
+        print(f"\n Feature columns: {list(enhanced.columns)}")
     else:
-        print("\n❌ Statistics generation failed")
+        print("\n Statistics generation failed")

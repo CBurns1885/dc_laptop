@@ -240,7 +240,7 @@ def _target_bands(total: pd.Series, bands: List[Tuple[int,int]], labels: List[st
 
 def _add_rest_days_feature(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate days since last match for home and away teams.
+    Calculate days since last match for home and away teams (OPTIMIZED).
 
     Research shows:
     - < 4 days rest: ~12% fewer goals scored (fixture congestion)
@@ -253,45 +253,46 @@ def _add_rest_days_feature(df: pd.DataFrame) -> pd.DataFrame:
     - Christmas/holiday fixture congestion
     """
     df = df.sort_values(['League', 'Date']).copy()
+    df['Date'] = pd.to_datetime(df['Date'])
+    
+    # Initialize with default rest days
+    df['home_rest_days'] = 14
+    df['away_rest_days'] = 14
+    
+    # Process each league separately for efficiency
+    leagues = df['League'].unique()
+    total_leagues = len(leagues)
 
-    home_rest_days = []
-    away_rest_days = []
+    for league_num, league in enumerate(leagues, 1):
+        league_mask = df['League'] == league
+        league_df = df[league_mask].copy()
+        league_matches = len(league_df)
 
-    for idx, row in df.iterrows():
-        home_team = row['HomeTeam']
-        away_team = row['AwayTeam']
-        match_date = pd.to_datetime(row['Date'])
-        league = row['League']
+        print(f"   [{league_num}/{total_leagues}] Processing {league}: {league_matches} matches...", end='', flush=True)
 
-        # Find last match for home team (same league only)
-        home_prev = df[(df['Date'] < row['Date']) &
-                       (df['League'] == league) &
-                       ((df['HomeTeam'] == home_team) | (df['AwayTeam'] == home_team))]
+        # Build dict of last match dates for each team
+        team_last_match = {}
 
-        # Find last match for away team (same league only)
-        away_prev = df[(df['Date'] < row['Date']) &
-                       (df['League'] == league) &
-                       ((df['HomeTeam'] == away_team) | (df['AwayTeam'] == away_team))]
+        for idx in league_df.index:
+            row = df.loc[idx]
+            home_team = row['HomeTeam']
+            away_team = row['AwayTeam']
+            match_date = row['Date']
 
-        # Calculate rest days
-        if len(home_prev) > 0:
-            last_home_date = pd.to_datetime(home_prev.iloc[-1]['Date'])
-            home_rest = (match_date - last_home_date).days
-        else:
-            home_rest = 14  # Default: assume 2 weeks rest if no previous match
+            # Calculate rest for home team
+            if home_team in team_last_match:
+                df.loc[idx, 'home_rest_days'] = (match_date - team_last_match[home_team]).days
 
-        if len(away_prev) > 0:
-            last_away_date = pd.to_datetime(away_prev.iloc[-1]['Date'])
-            away_rest = (match_date - last_away_date).days
-        else:
-            away_rest = 14  # Default: assume 2 weeks rest if no previous match
+            # Calculate rest for away team
+            if away_team in team_last_match:
+                df.loc[idx, 'away_rest_days'] = (match_date - team_last_match[away_team]).days
 
-        home_rest_days.append(home_rest)
-        away_rest_days.append(away_rest)
+            # Update last match dates
+            team_last_match[home_team] = match_date
+            team_last_match[away_team] = match_date
 
-    df['home_rest_days'] = home_rest_days
-    df['away_rest_days'] = away_rest_days
-
+        print(f" Done!")
+    
     # Add categorical bands for easier analysis
     df['home_rest_band'] = pd.cut(df['home_rest_days'],
                                    bins=[0, 3, 6, 100],
@@ -300,8 +301,8 @@ def _add_rest_days_feature(df: pd.DataFrame) -> pd.DataFrame:
                                    bins=[0, 3, 6, 100],
                                    labels=['short', 'medium', 'long'])
 
-    print(f"  ✅ Rest days calculated - Avg home: {df['home_rest_days'].mean():.1f}, away: {df['away_rest_days'].mean():.1f}")
-    print(f"  📊 Short rest (<4 days): {(df['home_rest_days'] < 4).sum()} home, {(df['away_rest_days'] < 4).sum()} away")
+    print(f"   Rest days calculated - Avg home: {df['home_rest_days'].mean():.1f}, away: {df['away_rest_days'].mean():.1f}")
+    print(f"   Short rest (<4 days): {(df['home_rest_days'] < 4).sum()} home, {(df['away_rest_days'] < 4).sum()} away")
 
     return df
 
@@ -348,8 +349,8 @@ def _add_match_number_feature(df: pd.DataFrame) -> pd.DataFrame:
 
     df['match_number'] = match_numbers
 
-    print(f"  ✅ Match numbers calculated - Range: 0 to {df['match_number'].max()}")
-    print(f"  📊 Distribution: Early (0-10): {(df['match_number'] <= 10).sum()}, "
+    print(f"   Match numbers calculated - Range: 0 to {df['match_number'].max()}")
+    print(f"   Distribution: Early (0-10): {(df['match_number'] <= 10).sum()}, "
           f"Mid (11-28): {((df['match_number'] > 10) & (df['match_number'] <= 28)).sum()}, "
           f"Late (29+): {(df['match_number'] > 28).sum()}")
 

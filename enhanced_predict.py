@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 from models import load_trained_targets, predict_proba
 from features import _load_features, _feature_columns
-from config import OU_LINES, AH_LINES, MODEL_ARTIFACTS_DIR, OUTPUT_DIR
+from config import OU_LINES, MODEL_ARTIFACTS_DIR, OUTPUT_DIR
 
 def _collect_market_columns() -> List[str]:
     """Return all expected probability column names."""

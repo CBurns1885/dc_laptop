@@ -14,4 +14,4 @@ def create_superblend_predictions(input_csv: Path, output_csv: Path):
     """
     df = pd.read_csv(input_csv)
     df.to_csv(output_csv, index=False)
-    print("ℹ️ Ensemble blending not used in DC-only system (predictions copied as-is)")
+    print("ℹ Ensemble blending not used in DC-only system (predictions copied as-is)")

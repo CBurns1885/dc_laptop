@@ -57,12 +57,12 @@ class BetFinder:
         print(f"Loading {filepath}...")
 
         if not filepath.exists():
-            print(f"❌ Error: {filepath} not found!")
+            print(f" Error: {filepath} not found!")
             print(f"   Make sure you've run the weekly pipeline first.")
             return False
 
         self.df = pd.read_csv(filepath)
-        print(f"✅ Loaded {len(self.df)} matches")
+        print(f" Loaded {len(self.df)} matches")
         print(f"   Date range: {self.df['Date'].min()} to {self.df['Date'].max()}")
         return True
 
@@ -177,7 +177,7 @@ class BetFinder:
     def find_quality_bets(self):
         """Scan all matches and find quality betting opportunities"""
         print("\n" + "="*60)
-        print("🔍 SCANNING FOR QUALITY BETS (BTTS & O/U 0.5-5.5)")
+        print(" SCANNING FOR QUALITY BETS (BTTS & O/U 0.5-5.5)")
         print("="*60)
 
         self.quality_bets = []
@@ -214,7 +214,7 @@ class BetFinder:
                     # Silently skip any checker errors
                     pass
 
-        print(f"✅ Found {len(self.quality_bets)} quality betting opportunities")
+        print(f" Found {len(self.quality_bets)} quality betting opportunities")
         return self.quality_bets
 
     def calculate_kelly_stake(self, probability, odds):
@@ -228,8 +228,8 @@ class BetFinder:
     def generate_report(self):
         """Generate detailed betting report"""
         if not self.quality_bets:
-            print("\n❌ No quality bets found with current criteria.")
-            print("💡 Try adjusting the CONFIG thresholds to be less strict.")
+            print("\n No quality bets found with current criteria.")
+            print(" Try adjusting the CONFIG thresholds to be less strict.")
             return
 
         # Convert to DataFrame
@@ -248,15 +248,15 @@ class BetFinder:
                 axis=1
             )
 
-        # Sort by Date first for better readability
+        # Sort by Date, League, then Score for better readability
         if 'Date' in bets_df.columns:
             bets_df['Date'] = pd.to_datetime(bets_df['Date'], errors='coerce')
-            bets_df = bets_df.sort_values(['Date', 'Score'], ascending=[True, False])
-            print("✅ Sorted quality bets by Date, then by Score")
+            bets_df = bets_df.sort_values(['Date', 'League', 'Score'], ascending=[True, True, False])
+            print(" Sorted quality bets by Date, League, then Score")
 
         # Display summary
         print("\n" + "="*60)
-        print("📊 BETTING SUMMARY (DC-ONLY: BTTS & O/U)")
+        print(" BETTING SUMMARY (DC-ONLY: BTTS & O/U)")
         print("="*60)
         print(f"Total quality bets: {len(bets_df)}")
         print(f"Matches covered: {bets_df[['HomeTeam', 'AwayTeam']].drop_duplicates().shape[0]}")
@@ -266,16 +266,16 @@ class BetFinder:
         # Save to CSV
         output_file = OUTPUT_DIR / f"quality_bets_dc_{datetime.now().strftime('%Y%m%d')}.csv"
         bets_df.to_csv(output_file, index=False)
-        print(f"\n💾 Saved to: {output_file}")
+        print(f"\n Saved to: {output_file}")
 
         # Save to HTML
         html_file = OUTPUT_DIR / f"quality_bets_dc_{datetime.now().strftime('%Y%m%d')}.html"
         self.generate_html_report(bets_df, html_file)
-        print(f"💾 Saved HTML: {html_file}")
+        print(f" Saved HTML: {html_file}")
 
         # Display top 20
         print("\n" + "="*60)
-        print("🏆 TOP 20 QUALITY BETS (DIXON-COLES)")
+        print(" TOP 20 QUALITY BETS (DIXON-COLES)")
         print("="*60)
 
         display_cols = ['Date', 'HomeTeam', 'AwayTeam', 'Market', 'Selection',
@@ -407,7 +407,7 @@ class BetFinder:
 </head>
 <body>
     <div class="container">
-        <h1>⚽ Dixon-Coles Quality Bets: BTTS & O/U (0.5-5.5)</h1>
+        <h1> Dixon-Coles Quality Bets: BTTS & O/U (0.5-5.5)</h1>
         <p class="subtitle">Generated on {datetime.now().strftime('%B %d, %Y at %H:%M')}</p>
 
         <div class="stats">
@@ -473,11 +473,11 @@ class BetFinder:
         </table>
 
         <div class="footer">
-            <p><strong>⚠️ Betting Disclaimer:</strong> These are predictions based on Dixon-Coles statistical model.
+            <p><strong> Betting Disclaimer:</strong> These are predictions based on Dixon-Coles statistical model.
             Past performance does not guarantee future results. Bet responsibly.</p>
-            <p><strong>💡 How to use:</strong> Look for bets with high probability, high confidence,
+            <p><strong> How to use:</strong> Look for bets with high probability, high confidence,
             and high agreement. Compare implied odds with bookmaker odds to find value.</p>
-            <p><strong>📊 Dixon-Coles Markets:</strong> BTTS (Both Teams To Score) and Over/Under goal lines (0.5, 1.5, 2.5, 3.5, 4.5, 5.5)</p>
+            <p><strong> Dixon-Coles Markets:</strong> BTTS (Both Teams To Score) and Over/Under goal lines (0.5, 1.5, 2.5, 3.5, 4.5, 5.5)</p>
         </div>
     </div>
 </body>
@@ -490,7 +490,7 @@ class BetFinder:
     def run(self):
         """Main execution flow"""
         print("="*60)
-        print("⚽ BET FINDER - Dixon-Coles: BTTS & O/U (0.5-5.5)")
+        print(" BET FINDER - Dixon-Coles: BTTS & O/U (0.5-5.5)")
         print("="*60)
 
         if not self.load_data():
@@ -502,16 +502,16 @@ class BetFinder:
             self.generate_report()
 
             print("\n" + "="*60)
-            print("✅ BET FINDER COMPLETE")
+            print(" BET FINDER COMPLETE")
             print("="*60)
-            print("\n💡 Next steps:")
+            print("\n Next steps:")
             print("   1. Review the HTML report in your browser")
             print("   2. Compare implied odds with bookmaker odds")
             print("   3. Look for value bets (bookmaker odds > implied odds)")
             print("   4. Use Kelly % for stake sizing (bet conservatively!)")
             print("   5. Track your bets in a spreadsheet")
         else:
-            print("\n💡 Tips to find more bets:")
+            print("\n Tips to find more bets:")
             print("   - Lower min_prob thresholds in CONFIG")
             print("   - Lower min_confidence to 0.55")
             print("   - Lower min_agreement to 65")

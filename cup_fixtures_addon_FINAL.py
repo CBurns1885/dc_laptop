@@ -295,19 +295,19 @@ def download_and_merge_cups(existing_fixtures_path: Path, days_ahead: int = 14) 
     """Download cups and merge with existing fixtures"""
     
     print("="*70)
-    print("🏆 CUP FIXTURES ADD-ON (DUAL-LEAGUE + API SEASON FIX)")
+    print(" CUP FIXTURES ADD-ON (DUAL-LEAGUE + API SEASON FIX)")
     print("="*70)
     print(f"Current season: {CURRENT_SEASON}")
     print(f"Fetching cup fixtures for next {days_ahead} days...")
     
     if not existing_fixtures_path.exists():
-        print(f"❌ File not found: {existing_fixtures_path}")
+        print(f" File not found: {existing_fixtures_path}")
         return existing_fixtures_path
     
     existing_df = pd.read_csv(existing_fixtures_path)
-    print(f"📂 Loaded {len(existing_df)} existing fixtures")
+    print(f" Loaded {len(existing_df)} existing fixtures")
     
-    print("\n🏆 Downloading cup fixtures...")
+    print("\n Downloading cup fixtures...")
     all_cup_fixtures = []
     
     for league_id, comp_name in CUP_COMPETITIONS.items():
@@ -316,22 +316,22 @@ def download_and_merge_cups(existing_fixtures_path: Path, days_ahead: int = 14) 
         fixtures = fetch_fixtures(league_id, CURRENT_SEASON, days_ahead)
         
         if fixtures:
-            print(f"✅ {len(fixtures)} matches")
+            print(f" {len(fixtures)} matches")
             for fixture_data in fixtures:
                 rows = convert_fixture(fixture_data)
                 all_cup_fixtures.extend(rows)
         else:
-            print("⚠️ None")
+            print(" None")
         
         # Rate limiting: wait 6 seconds between requests (10 per minute max)
         time.sleep(6)
     
     if not all_cup_fixtures:
-        print("\n⚠️ No cup fixtures found")
+        print("\n No cup fixtures found")
         return existing_fixtures_path
     
     cup_df = pd.DataFrame(all_cup_fixtures)
-    print(f"\n📊 Created {len(cup_df)} prediction rows from cup fixtures")
+    print(f"\n Created {len(cup_df)} prediction rows from cup fixtures")
     
     # Match columns
     for col in existing_df.columns:
@@ -356,11 +356,11 @@ def download_and_merge_cups(existing_fixtures_path: Path, days_ahead: int = 14) 
     merged_path = OUTPUT_DIR / "upcoming_fixtures_with_cups.csv"
     merged_df.to_csv(merged_path, index=False)
     
-    print(f"\n✅ MERGED: {merged_path}")
+    print(f"\n MERGED: {merged_path}")
     print(f"   Total prediction rows: {len(merged_df)}")
     print(f"   Added: {len(merged_df) - len(existing_df)} cup prediction rows")
     
-    print("\n📊 League breakdown:")
+    print("\n League breakdown:")
     for league in sorted(merged_df["League"].unique()):
         count = len(merged_df[merged_df["League"] == league])
         print(f"   {league}: {count} prediction rows")
@@ -379,4 +379,4 @@ if __name__ == "__main__":
         input_path = OUTPUT_DIR / args.input
     
     merged_path = download_and_merge_cups(input_path, args.days)
-    print(f"\n✅ Use this file: {merged_path}")
+    print(f"\n Use this file: {merged_path}")

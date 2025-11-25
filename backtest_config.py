@@ -53,7 +53,7 @@ BACKTEST_CONFIGS = {
 
 def select_backtest_config():
     """Interactive configuration selection"""
-    print("\n🔬 BACKTESTING CONFIGURATION")
+    print("\n BACKTESTING CONFIGURATION")
     print("="*50)
     print("\nAvailable configurations:")
     
@@ -83,7 +83,7 @@ def select_backtest_config():
 def run_backtest_with_config(config: dict, config_name: str):
     """Run backtest with selected configuration"""
     print(f"\n{'='*60}")
-    print(f"🚀 Running: {config['name']}")
+    print(f" Running: {config['name']}")
     print(f"{'='*60}")
     
     # Calculate dates
@@ -119,7 +119,7 @@ def print_backtest_insights(summary: pd.DataFrame, config_name: str):
         return
     
     print("\n" + "="*60)
-    print("💡 KEY INSIGHTS")
+    print(" KEY INSIGHTS")
     print("="*60)
     
     # Best performing market
@@ -127,7 +127,7 @@ def print_backtest_insights(summary: pd.DataFrame, config_name: str):
     best_acc = summary.loc[best_market, 'Accuracy']
     best_roi = summary.loc[best_market, 'ROI']
     
-    print(f"\n🏆 Best Market: {best_market}")
+    print(f"\n Best Market: {best_market}")
     print(f"   • Accuracy: {best_acc:.1%}")
     print(f"   • ROI: {best_roi:+.1f}%")
     print(f"   • Matches: {summary.loc[best_market, 'Total_Matches']:.0f}")
@@ -136,7 +136,7 @@ def print_backtest_insights(summary: pd.DataFrame, config_name: str):
     worst_market = summary['Accuracy'].idxmin()
     worst_acc = summary.loc[worst_market, 'Accuracy']
     
-    print(f"\n⚠️ Weakest Market: {worst_market}")
+    print(f"\n Weakest Market: {worst_market}")
     print(f"   • Accuracy: {worst_acc:.1%}")
     print(f"   • Needs improvement")
     
@@ -145,28 +145,28 @@ def print_backtest_insights(summary: pd.DataFrame, config_name: str):
     total_matches = summary['Total_Matches'].sum()
     overall_roi = (total_profit / total_matches * 100) if total_matches > 0 else 0
     
-    print(f"\n💰 Overall Performance:")
+    print(f"\n Overall Performance:")
     print(f"   • Total Profit/Loss: {total_profit:+.1f} units")
     print(f"   • Overall ROI: {overall_roi:+.1f}%")
-    print(f"   • Status: {'PROFITABLE ✅' if total_profit > 0 else 'LOSING ❌'}")
+    print(f"   • Status: {'PROFITABLE ' if total_profit > 0 else 'LOSING '}")
     
     # Recommendations
-    print(f"\n📋 Recommendations:")
+    print(f"\n Recommendations:")
     
     profitable_markets = summary[summary['ROI'] > 0].index.tolist()
     if profitable_markets:
-        print(f"   ✅ Focus on: {', '.join(profitable_markets)}")
+        print(f"    Focus on: {', '.join(profitable_markets)}")
     
     unprofitable_markets = summary[summary['ROI'] < 0].index.tolist()
     if unprofitable_markets:
-        print(f"   ❌ Avoid/improve: {', '.join(unprofitable_markets)}")
+        print(f"    Avoid/improve: {', '.join(unprofitable_markets)}")
     
     # Calibration check
     avg_brier = summary['Avg_Brier_Score'].mean()
     if avg_brier < 0.2:
-        print(f"   ✅ Well-calibrated predictions (Brier: {avg_brier:.3f})")
+        print(f"    Well-calibrated predictions (Brier: {avg_brier:.3f})")
     elif avg_brier > 0.3:
-        print(f"   ⚠️ Poor calibration (Brier: {avg_brier:.3f}) - consider recalibration")
+        print(f"    Poor calibration (Brier: {avg_brier:.3f}) - consider recalibration")
     
     print("\n" + "="*60)
 
@@ -177,7 +177,7 @@ def print_backtest_insights(summary: pd.DataFrame, config_name: str):
 
 def compare_multiple_periods():
     """Compare backtest performance across multiple periods"""
-    print("\n📊 MULTI-PERIOD COMPARISON")
+    print("\n MULTI-PERIOD COMPARISON")
     print("="*50)
     
     periods = ['last_3_months', 'last_6_months', 'last_season']
@@ -185,17 +185,17 @@ def compare_multiple_periods():
     
     for period_key in periods:
         config = BACKTEST_CONFIGS[period_key]
-        print(f"\n▶ Testing: {config['name']}")
+        print(f"\n Testing: {config['name']}")
         
         try:
             summary = run_backtest_with_config(config, period_key)
             all_summaries[period_key] = summary
         except Exception as e:
-            print(f"   ❌ Failed: {e}")
+            print(f"    Failed: {e}")
     
     # Generate comparison report
     print("\n" + "="*60)
-    print("📈 PERIOD COMPARISON")
+    print(" PERIOD COMPARISON")
     print("="*60)
     
     for period_key, summary in all_summaries.items():
@@ -218,7 +218,7 @@ def compare_multiple_periods():
 def main():
     """Main backtest runner"""
     print("="*60)
-    print("🔬 FOOTBALL PREDICTION BACKTESTING SYSTEM")
+    print(" FOOTBALL PREDICTION BACKTESTING SYSTEM")
     print("="*60)
     
     print("\nOptions:")
@@ -250,8 +250,8 @@ def main():
         
         run_backtest_with_config(custom_config, 'custom')
     
-    print("\n✅ Backtesting complete!")
-    print("📂 Results saved in outputs/")
+    print("\n Backtesting complete!")
+    print(" Results saved in outputs/")
     print("   • backtest_summary.csv - Overall stats")
     print("   • backtest_detailed.csv - Period-by-period results")
 
