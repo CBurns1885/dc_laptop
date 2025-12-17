@@ -203,7 +203,7 @@ print(f"   Incremental training: ENABLED (reuses models when possible)")
 # RUN PIPELINE WITH ERROR RECOVERY
 # ============================================================================
 
-TOTAL_STEPS = 18
+TOTAL_STEPS = 19
 errors = []
 
 def run_step(step_num, step_name, func, *args, **kwargs):
@@ -266,7 +266,7 @@ try:
 
                     # Check fixture freshness
                     if 'Date' in fixtures_df.columns:
-                        fixtures_df['Date'] = pd.to_datetime(fixtures_df['Date'], errors='coerce')
+                        fixtures_df['Date'] = pd.to_datetime(fixtures_df['Date'], dayfirst=True, errors='coerce')
                         latest_fixture = fixtures_df['Date'].max()
                         days_ahead = (latest_fixture - pd.Timestamp.now()).days
 
@@ -332,9 +332,54 @@ try:
         print(" Team/referee statistics generated")
     
     run_step(4, "GENERATE STATISTICS", step4)
-    
-    # Step 5: Build features (filtered to detected leagues only)
-    def step5():
+
+    # Step 5: Enrich historical data with days since last match
+    def step5_enrich():
+        """Add accurate days-since-last-match to historical data (includes cup games)"""
+        try:
+            from days_since_match_fetcher import add_days_since_features
+            import pandas as pd
+
+            hist_path = Path("data/processed/historical_matches.parquet")
+
+            if hist_path.exists():
+                print(" Enriching historical data with complete match schedules...")
+                df_hist = pd.read_parquet(hist_path)
+
+                # Check if already enriched
+                if 'Home_DaysSinceLast' in df_hist.columns and 'Away_DaysSinceLast' in df_hist.columns:
+                    print("   Already enriched, skipping")
+                else:
+                    # Enrich with API (includes cup games)
+                    df_hist = add_days_since_features(df_hist, use_api=True)
+
+                    # Save enriched data
+                    df_hist.to_parquet(hist_path, index=False)
+                    print(f" Historical data enriched with accurate rest days")
+            else:
+                print(" No historical data found, skipping enrichment")
+
+        except ValueError as e:
+            # No API key - fall back to league-only
+            print(f" Warning: {e}")
+            print("   Using league-only data (will miss cup games)")
+            from days_since_match_fetcher import add_days_since_features
+            import pandas as pd
+            hist_path = Path("data/processed/historical_matches.parquet")
+            if hist_path.exists():
+                df_hist = pd.read_parquet(hist_path)
+                if 'Home_DaysSinceLast' not in df_hist.columns:
+                    df_hist = add_days_since_features(df_hist, use_api=False)
+                    df_hist.to_parquet(hist_path, index=False)
+
+        except Exception as e:
+            print(f" Historical data enrichment skipped: {e}")
+            print("   (Continuing without days-since-match data)")
+
+    run_step(5, "ENRICH HISTORICAL DATA", step5_enrich)
+
+    # Step 6: Build features (filtered to detected leagues only)
+    def step6():
         if league_context['detected_leagues']:
             print(f" Filtering to leagues: {league_context['detected_leagues']}")
             # Filter historical data to only detected leagues before building features
@@ -370,46 +415,93 @@ try:
 
         build_features(force=True)
 
-    run_step(5, "BUILD FEATURES", step5)
-    
-    # Step 6: Train/load models
-    def step6():
+    run_step(6, "BUILD FEATURES", step6)
+
+    # Step 7: Train/load models
+    def step7():
         from incremental_trainer import smart_train_or_load
         return smart_train_or_load()
-    
-    models, err = run_step(6, "TRAIN/LOAD MODELS", step6)
-    
-    # Step 7: Prepare fixtures
-    def step7():
+
+    models, err = run_step(7, "TRAIN/LOAD MODELS", step7)
+
+    # Step 8: Prepare fixtures
+    def step8():
         if fixtures_file.suffix.lower() == '.xlsx':
             return xlsx_to_csv(fixtures_file)
         return fixtures_file
-    
-    fixtures_csv_path, err = run_step(7, "PREPARE FIXTURES", step7)
-    
-    # Step 8: Generate predictions
-    def step8():
+
+    fixtures_csv_path, err = run_step(8, "PREPARE FIXTURES", step8)
+
+    # Step 9: Enrich fixtures with days since last match (includes cup games)
+    def step9_enrich():
+        """Add accurate days-since-last-match to fixtures using Claude API"""
+        try:
+            from days_since_match_fetcher import add_days_since_features
+            import pandas as pd
+
+            # Load fixtures
+            fixtures = pd.read_csv(fixtures_csv_path)
+
+            # Enrich with API (includes cup games, not just league)
+            print(" Fetching complete match schedules for fixtures (including cups)...")
+            fixtures_enriched = add_days_since_features(fixtures, use_api=True)
+
+            # Save enriched fixtures
+            fixtures_enriched.to_csv(fixtures_csv_path, index=False)
+            print(f" Fixtures enriched with accurate rest days")
+
+        except ValueError as e:
+            # No API key - fall back to league-only
+            print(f" Warning: {e}")
+            print("   Using league-only data (will miss cup games)")
+            from days_since_match_fetcher import add_days_since_features
+            import pandas as pd
+            fixtures = pd.read_csv(fixtures_csv_path)
+            fixtures_enriched = add_days_since_features(fixtures, use_api=False)
+            fixtures_enriched.to_csv(fixtures_csv_path, index=False)
+
+        except Exception as e:
+            print(f" Fixtures enrichment skipped: {e}")
+            print("   (Continuing with standard fixtures)")
+
+    run_step(9, "ENRICH FIXTURES", step9_enrich)
+
+    # Step 10: Generate predictions
+    def step10():
         predict_week(fixtures_csv_path)
-    
-    run_step(8, "GENERATE PREDICTIONS", step8)
-    
+
+    run_step(10, "GENERATE PREDICTIONS", step10)
+
     # ========================================================================
     # ENHANCEMENT STEPS
     # ========================================================================
-    
-    # Step 9: Optimize BTTS/O/U Predictions
-    def step9():
+
+    # Step 11: Split Predictions by Market
+    def step11():
+        from market_splitter import split_predictions
+        csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
+
+        if csv_path.exists():
+            split_predictions(csv_path, OUTPUT_DIR)
+            print(" Predictions split into market-specific files")
+        else:
+            raise FileNotFoundError("weekly_bets_lite.csv not found")
+
+    run_step(11, "SPLIT BY MARKET", step11)
+
+    # Step 12: Optimize BTTS/O/U Predictions
+    def step12_optimize():
         try:
             from btts_ou_optimizer import optimize_weekly_predictions
             csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
             hist_path = Path("data/historical_results.parquet")
             output_path = OUTPUT_DIR / "weekly_bets_lite_optimized.csv"
-            
+
             if csv_path.exists():
                 import pandas as pd
                 hist_df = pd.read_parquet(hist_path) if hist_path.exists() else None
                 optimize_weekly_predictions(csv_path, hist_df, output_path)
-                
+
                 import shutil
                 shutil.copy(output_path, csv_path)
                 print(" BTTS/O/U optimized with historical patterns")
@@ -418,11 +510,11 @@ try:
         except Exception as e:
             print(f" BTTS/OU optimization skipped: {e}")
             print("   (Continuing with standard predictions)")
-    
-    run_step(9, "OPTIMIZE BTTS/O/U", step9)
-    
-    # Step 10: Smart Ensemble Blending
-    def step10():
+
+    run_step(12, "OPTIMIZE BTTS/O/U", step12_optimize)
+
+    # Step 13: Smart Ensemble Blending
+    def step13_blend():
         try:
             from ensemble_blender import create_superblend_predictions
             input_file = OUTPUT_DIR / "weekly_bets_lite.csv"
@@ -440,10 +532,10 @@ try:
             print(f" Ensemble blending skipped: {e}")
             print("   (Continuing with standard blending)")
     
-    run_step(10, "SMART ENSEMBLE BLENDING", step10)
-    
-    # Step 11: Log predictions
-    def step11():
+    run_step(13, "SMART ENSEMBLE BLENDING", step13_blend)
+
+    # Step 14: Log predictions
+    def step14_log():
         from accuracy_tracker import log_weekly_predictions
         week_id = dt.datetime.now().strftime('%Y-W%W')
         csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
@@ -454,99 +546,34 @@ try:
         else:
             raise FileNotFoundError("weekly_bets_lite.csv not found")
     
-    run_step(11, "LOG PREDICTIONS", step11)
-    
-    # Step 12: Generate weighted Top 50
-    def step12():
-        from weighted_top50 import generate_weighted_top50
-        csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
-        
-        if csv_path.exists():
-            generate_weighted_top50(csv_path)
-            print(" Weighted Top 50 generated")
-        else:
-            raise FileNotFoundError("weekly_bets_lite.csv not found")
-    
-    run_step(12, "GENERATE WEIGHTED TOP 50", step12)
-    
-    # Step 13: O/U Analysis
-    def step13():
-        from ou_analyzer import analyze_ou_predictions
-        weekly_bets_FILE = OUTPUT_DIR / "weekly_bets_lite.csv"
+    run_step(14, "LOG PREDICTIONS", step14_log)
 
-        if weekly_bets_FILE.exists():
-            df_ou = analyze_ou_predictions(min_confidence=0.65)
-
-            if not df_ou.empty:
-                print(f" O/U Analysis: {len(df_ou)} predictions")
-                elite = len(df_ou[df_ou['Best_Prob'] >= 0.85])
-                high = len(df_ou[df_ou['Best_Prob'] >= 0.75])
-                print(f"   Elite (85%+): {elite}, High (75%+): {high}")
-            else:
-                print(" No high-confidence O/U predictions")
-        else:
-            raise FileNotFoundError("weekly_bets_lite.csv not found")
-    
-    run_step(13, "O/U ANALYSIS", step13)
-    
-    # Step 14: Build Accumulators
-    def step14():
-        from accumulator_finder import AccumulatorFinder
-        csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
-        
-        if csv_path.exists():
-            finder = AccumulatorFinder(csv_path)
-            
-            strategies = {
-                'safe': {'min_prob': 0.75, 'min_legs': 4, 'max_legs': 4},
-                'mixed': {'min_prob': 0.70, 'min_legs': 5, 'max_legs': 5},
-                'aggressive': {'min_prob': 0.65, 'min_legs': 6, 'max_legs': 6}
-            }
-            
-            acca_count = 0
-            for strategy_name, params in strategies.items():
-                accumulators = finder.build_accumulators(
-                    min_legs=params['min_legs'],
-                    max_legs=params['max_legs'],
-                    min_prob=params['min_prob']
-                )
-                acca_path = OUTPUT_DIR / f"accumulators_{strategy_name}.html"
-                finder.generate_html_report(accumulators, acca_path)
-                acca_count += 1
-            
-            print(f" Generated {acca_count} accumulator strategies")
-        else:
-            raise FileNotFoundError("weekly_bets_lite.csv not found")
-    
-    run_step(14, "BUILD ACCUMULATORS", step14)
-    
-    # Step 15: Find Quality Bets (ALL MARKETS)
-    def step15():
-        from bet_finder import BetFinder
+    # Step 15: High Confidence Bets (90%+, ALL MARKETS)
+    def step15_highconf():
+        from generate_outputs_from_actual import generate_high_confidence_bets
         csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
 
         if csv_path.exists():
-            # Create bet finder instance
-            finder = BetFinder()
-
-            # Load data
-            if finder.load_data(csv_path):
-                # Find quality bets
-                finder.find_quality_bets()
-
-                # Generate report
-                if finder.quality_bets:
-                    finder.generate_report()
-                    print(f" Quality bets report generated: {len(finder.quality_bets)} opportunities found")
-                else:
-                    print(" No quality bets found with current criteria")
+            generate_high_confidence_bets(csv_path, threshold=0.90)
         else:
             raise FileNotFoundError("weekly_bets_lite.csv not found")
-    
-    run_step(15, "FIND QUALITY BETS (ALL MARKETS)", step15)
-    
-    # Step 16: Log predictions for accuracy tracking
-    def step16():
+
+    run_step(15, "HIGH CONFIDENCE BETS (90%+)", step15_highconf)
+
+    # Step 16: O/U Accumulators (4-Fold, 90%+ Only)
+    def step16_acca():
+        from generate_outputs_from_actual import generate_ou_accumulators
+        csv_path = OUTPUT_DIR / "high_confidence_bets.csv"
+
+        if csv_path.exists():
+            generate_ou_accumulators(csv_path)
+        else:
+            raise FileNotFoundError("high_confidence_bets.csv not found")
+
+    run_step(16, "O/U ACCUMULATORS (4-FOLD, 90%+)", step16_acca)
+
+    # Step 17: Log predictions for accuracy tracking
+    def step17_track():
         from accuracy_tracker import log_weekly_predictions
         csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
 
@@ -555,11 +582,11 @@ try:
             print(" Predictions logged for accuracy tracking")
         else:
             print(" weekly_bets_lite.csv not found, skipping accuracy tracking")
-    
-    run_step(16, "UPDATE ACCURACY DATABASE", step16)
 
-    # Step 17: Generate Excel Report and Send Email
-    def step17():
+    run_step(17, "UPDATE ACCURACY DATABASE", step17_track)
+
+    # Step 18: Generate Excel Report and Send Email
+    def step18_excel():
         from excel_generator import generate_excel_report
         from email_sender import send_weekly_predictions
 
@@ -580,10 +607,10 @@ try:
         else:
             raise FileNotFoundError("weekly_bets.csv not found")
 
-    run_step(17, "GENERATE EXCEL & SEND EMAIL", step17)
+    run_step(18, "GENERATE EXCEL & SEND EMAIL", step18_excel)
 
-    # Step 18: Archive outputs
-    def step18():
+    # Step 19: Archive outputs
+    def step19_archive():
         """Copy all output files to dated archive folder"""
         import shutil
         from datetime import datetime
@@ -635,7 +662,7 @@ try:
         
         print(f" Archived {archived_count} files to {archive_dir}")
 
-    run_step(18, "ARCHIVE OUTPUTS", step18)
+    run_step(19, "ARCHIVE OUTPUTS", step19_archive)
     
     # ========================================================================
     # SUCCESS SUMMARY
@@ -655,10 +682,16 @@ try:
         print("\n All steps completed successfully!")
     
     print("\n Main Files:")
-    print("   • weekly_bets_lite.csv - All predictions")
-    print("   • top50_weighted.html - Top picks (weighted)")
-    
+    print("   • weekly_bets_lite.csv - All predictions (master file)")
+
+    print("\n Market-Specific Files (NEW!):")
+    print("   • predictions_1x2.html/csv - Match result predictions")
+    print("   • predictions_btts.html/csv - Both teams to score")
+    print("   • predictions_ou_2_5.html/csv - Over/Under 2.5 goals")
+    print("   • predictions_ou_*_*.html/csv - Other O/U lines (0.5, 1.5, 3.5, 4.5, 5.5)")
+
     print("\n Specialized Reports:")
+    print("   • top50_weighted.html - Top picks (weighted)")
     print("   • ou_analysis.html - Over/Under analysis")
     print("   • accumulators_safe.html - Conservative 4-fold")
     print("   • accumulators_mixed.html - Balanced 5-fold")
@@ -670,9 +703,9 @@ try:
     
     print("\n" + "="*60)
     print(" Next Steps:")
-    print("   1. Review top50_weighted.html for best individual bets")
-    print("   2. Check quality_bets HTML for opportunities across ALL markets")
-    print("   3. Check ou_analysis.html for O/U opportunities")
+    print("   1. Check predictions_*.html files - one file per market type!")
+    print("   2. Review top50_weighted.html for best individual bets")
+    print("   3. Check quality_bets HTML for opportunities across ALL markets")
     print("   4. Review accumulator files for multi-leg options")
     print("   5. After matches: run update_results.py")
     print("="*60)

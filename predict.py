@@ -252,7 +252,7 @@ def _build_future_frame(fixtures_csv: Path) -> pd.DataFrame:
     """Enhanced feature building with time weighting"""
     base = _load_base_features()
     fx = pd.read_csv(fixtures_csv)
-    fx["Date"] = pd.to_datetime(fx["Date"])
+    fx["Date"] = pd.to_datetime(fx["Date"], dayfirst=True, errors='coerce')
     
     # Add time weights for recent form emphasis
     current_date = datetime.now()
@@ -925,7 +925,7 @@ def predict_week(fixtures_csv: Path) -> Path:
     
     # Load fixtures
     fx = pd.read_csv(fixtures_csv)
-    fx["Date"] = pd.to_datetime(fx["Date"])
+    fx["Date"] = pd.to_datetime(fx["Date"], dayfirst=True, errors='coerce')
     
     # Build features
     log_header("BUILD ENHANCED FEATURES")

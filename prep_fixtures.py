@@ -12,7 +12,7 @@ def xlsx_to_csv(xlsx_path: Path) -> Path:
         missing = [c for c in REQ if c not in df.columns]
         if missing:
             raise ValueError(f"Missing columns in fixtures: {missing}")
-        df["Date"] = pd.to_datetime(df["Date"])
+        df["Date"] = pd.to_datetime(df["Date"], dayfirst=True, errors='coerce')
         out = OUTPUT_DIR / "upcoming_fixtures.csv"
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         df.to_csv(out, index=False)

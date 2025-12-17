@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(findstr:*)",
+      "Bash(python -m pip:*)",
+      "Bash(py --version)",
+      "Bash(py -m pip:*)",
+      "Bash(py trace_imports.py:*)",
+      "Bash(del /Q \"combine_cross_league.py\" \"combined_fixture_downloader.py\" \"cup_fixtures_addon_FINAL.py\" \"enhanced_predict.py\" \"high_confidence_bets.py\" \"load_existing_stats.py\" \"ou_accumulators.py\" \"ou_analyzer.py\" \"realistic_backtest.py\" \"setup_structure.py\")",
+      "Bash(del /Q \"test_adaptive_quick.py\" \"test_all_updates.py\" \"test_claude_api.py\" \"test_dc_only.py\" \"test_new_outputs.py\" \"test_outputs_sample.py\" \"test_stats_generation.py\" \"validate_fixes.py\" \"weighted_top50.py\" \"pip install numpy pandas scikit-learn xg.py\")",
+      "Bash(cmd /c del:*)",
+      "Bash(dir:*)",
+      "Bash(powershell -Command \"Remove-Item -Path ''accumulator_finder.py'',''api_football_weekly_fixtures.py'',''auto_fixture_downloader.py'',''bet_finder.py'',''combine_cross_league.py'',''combined_fixture_downloader.py'',''cup_fixtures_addon_FINAL.py'',''enhanced_predict.py'',''high_confidence_bets.py'',''load_existing_stats.py'' -Force\")",
+      "Bash(powershell -Command \"Remove-Item -Path ''ou_accumulators.py'',''ou_analyzer.py'',''realistic_backtest.py'',''setup_structure.py'',''weighted_top50.py'',''test_adaptive_quick.py'',''test_all_updates.py'',''test_claude_api.py'',''test_dc_only.py'',''test_new_outputs.py'' -Force\")",
+      "Bash(powershell -Command \"Remove-Item -Path ''test_outputs_sample.py'',''test_stats_generation.py'',''validate_fixes.py'',''pip install numpy pandas scikit-learn xg.py'' -Force\")",
+      "Bash(ls:*)",
+      "Bash(py test_date_fix.py:*)",
+      "Bash(py test_accumulator_dedup.py:*)",
+      "Bash(py -c:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

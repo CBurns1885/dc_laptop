@@ -14,9 +14,9 @@ import pandas as pd
 # ============================================================================
 
 BACKTEST_CONFIGS = {
-    'last_3_months': {
-        'name': 'Last 3 Months',
-        'days_back': 90,
+    'last_2_weeks': {
+        'name': 'Last 4 weeks',
+        'days_back': 28,
         'window_days': 7,
         'description': 'Quick validation on recent data'
     },
@@ -122,51 +122,63 @@ def print_backtest_insights(summary: pd.DataFrame, config_name: str):
     print(" KEY INSIGHTS")
     print("="*60)
     
+    # Determine column names (handle both 'Accuracy' and 'Accuracy_%')
+    acc_col = 'Accuracy_%' if 'Accuracy_%' in summary.columns else 'Accuracy'
+    roi_col = 'ROI_%' if 'ROI_%' in summary.columns else 'ROI'
+
     # Best performing market
-    best_market = summary['Accuracy'].idxmax()
-    best_acc = summary.loc[best_market, 'Accuracy']
-    best_roi = summary.loc[best_market, 'ROI']
-    
+    best_market = summary[acc_col].idxmax()
+    best_acc = summary.loc[best_market, acc_col]
+    best_roi = summary.loc[best_market, roi_col] if roi_col in summary.columns else 0
+
+    # Convert accuracy to decimal if it's in percentage format
+    best_acc_pct = best_acc if best_acc > 1 else best_acc * 100
+
     print(f"\n Best Market: {best_market}")
-    print(f"   • Accuracy: {best_acc:.1%}")
-    print(f"   • ROI: {best_roi:+.1f}%")
+    print(f"   • Accuracy: {best_acc_pct:.1f}%")
+    if roi_col in summary.columns:
+        print(f"   • ROI: {best_roi:+.1f}%")
     print(f"   • Matches: {summary.loc[best_market, 'Total_Matches']:.0f}")
-    
+
     # Worst performing
-    worst_market = summary['Accuracy'].idxmin()
-    worst_acc = summary.loc[worst_market, 'Accuracy']
-    
+    worst_market = summary[acc_col].idxmin()
+    worst_acc = summary.loc[worst_market, acc_col]
+    worst_acc_pct = worst_acc if worst_acc > 1 else worst_acc * 100
+
     print(f"\n Weakest Market: {worst_market}")
-    print(f"   • Accuracy: {worst_acc:.1%}")
+    print(f"   • Accuracy: {worst_acc_pct:.1f}%")
     print(f"   • Needs improvement")
-    
+
     # Overall profitability
-    total_profit = summary['Total_Profit_Units'].sum()
-    total_matches = summary['Total_Matches'].sum()
-    overall_roi = (total_profit / total_matches * 100) if total_matches > 0 else 0
-    
-    print(f"\n Overall Performance:")
-    print(f"   • Total Profit/Loss: {total_profit:+.1f} units")
-    print(f"   • Overall ROI: {overall_roi:+.1f}%")
-    print(f"   • Status: {'PROFITABLE ' if total_profit > 0 else 'LOSING '}")
-    
+    if 'Total_Profit_Units' in summary.columns:
+        total_profit = summary['Total_Profit_Units'].sum()
+        total_matches = summary['Total_Matches'].sum()
+        overall_roi = (total_profit / total_matches * 100) if total_matches > 0 else 0
+
+        print(f"\n Overall Performance:")
+        print(f"   • Total Profit/Loss: {total_profit:+.1f} units")
+        print(f"   • Overall ROI: {overall_roi:+.1f}%")
+        print(f"   • Status: {'PROFITABLE ' if total_profit > 0 else 'LOSING '}")
+
     # Recommendations
     print(f"\n Recommendations:")
-    
-    profitable_markets = summary[summary['ROI'] > 0].index.tolist()
-    if profitable_markets:
-        print(f"    Focus on: {', '.join(profitable_markets)}")
-    
-    unprofitable_markets = summary[summary['ROI'] < 0].index.tolist()
-    if unprofitable_markets:
-        print(f"    Avoid/improve: {', '.join(unprofitable_markets)}")
+
+    if roi_col in summary.columns:
+        profitable_markets = summary[summary[roi_col] > 0].index.tolist()
+        if profitable_markets:
+            print(f"    Focus on: {', '.join(profitable_markets)}")
+
+        unprofitable_markets = summary[summary[roi_col] < 0].index.tolist()
+        if unprofitable_markets:
+            print(f"    Avoid/improve: {', '.join(unprofitable_markets)}")
     
     # Calibration check
-    avg_brier = summary['Avg_Brier_Score'].mean()
-    if avg_brier < 0.2:
-        print(f"    Well-calibrated predictions (Brier: {avg_brier:.3f})")
-    elif avg_brier > 0.3:
-        print(f"    Poor calibration (Brier: {avg_brier:.3f}) - consider recalibration")
+    if 'Brier_Score' in summary.columns:
+        avg_brier = summary['Brier_Score'].mean()
+        if avg_brier < 0.2:
+            print(f"    Well-calibrated predictions (Brier: {avg_brier:.3f})")
+        elif avg_brier > 0.3:
+            print(f"    Poor calibration (Brier: {avg_brier:.3f}) - consider recalibration")
     
     print("\n" + "="*60)
 

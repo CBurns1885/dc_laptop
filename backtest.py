@@ -201,8 +201,14 @@ class BacktestEngine:
             'all_predictions': []  # NEW: Track individual predictions for calibration
         }
         
-        # Define all markets to evaluate - DC-ONLY: BTTS and O/U (0.5-5.5)
+        # Define all markets to evaluate
         markets = {
+            # 1X2 - Match Result
+            '1X2': {
+                'actual': 'y_1X2',
+                'pred_cols': ['P_1X2_H', 'P_1X2_D', 'P_1X2_A'],
+                'outcomes': ['H', 'D', 'A']
+            },
             # BTTS
             'BTTS': {
                 'actual': 'y_BTTS',
@@ -265,10 +271,21 @@ class BacktestEngine:
             
             # Get predictions
             predictions = df.loc[valid, available_pred_cols]
-            
+
             # Find predicted outcome (highest probability)
-            pred_outcome_idx = predictions.idxmax(axis=1)
-            
+            # Use skipna=False to detect rows with all NaN values
+            pred_outcome_idx = predictions.idxmax(axis=1, skipna=True)
+
+            # Filter out rows where prediction is NaN (no valid predictions)
+            valid_predictions = pred_outcome_idx.notna()
+            pred_outcome_idx = pred_outcome_idx[valid_predictions]
+            predictions = predictions.loc[valid_predictions]
+            actual = actual.loc[valid_predictions]
+
+            if len(actual) == 0:
+                # No valid predictions for this market
+                continue
+
             # Map column names to outcomes
             outcome_map = {col: outcome for col, outcome in zip(pred_cols, outcomes)}
             predicted = pred_outcome_idx.map(outcome_map)
@@ -276,7 +293,16 @@ class BacktestEngine:
             # Track individual predictions for calibration analysis
             for idx in actual.index:
                 pred_col = pred_outcome_idx[idx]
+
+                # Skip if pred_col is somehow still NaN
+                if pd.isna(pred_col):
+                    continue
+
                 pred_prob = predictions.loc[idx, pred_col]
+
+                # Skip if probability is NaN
+                if pd.isna(pred_prob):
+                    continue
 
                 # Convert percentage string if needed
                 if isinstance(pred_prob, str):
@@ -312,10 +338,56 @@ class BacktestEngine:
                             brier_scores.append((pred_prob - true_prob) ** 2)
             
             brier = np.mean(brier_scores) if brier_scores else 0
-            
-            # ROI calculation (simplified - assumes even odds)
-            roi = ((correct / total) - 0.5) * 100 if total > 0 else 0
-            
+
+            # ROI calculation with realistic bookmaker margins (CONSERVATIVE)
+            # Apply market-specific margins to odds
+
+            # Market-specific bookmaker margins (typical)
+            market_margins = {
+                '1X2': 0.06,      # 6% margin (competitive market)
+                'BTTS': 0.08,     # 8% margin
+                'OU_0_5': 0.05,   # 5% margin (high volume)
+                'OU_1_5': 0.05,   # 5% margin
+                'OU_2_5': 0.04,   # 4% margin (most liquid)
+                'OU_3_5': 0.05,   # 5% margin
+                'OU_4_5': 0.06,   # 6% margin
+                'OU_5_5': 0.07,   # 7% margin (lower liquidity)
+            }
+
+            # Get margin for this market (default 6% if unknown)
+            margin = market_margins.get(market_name, 0.06)
+
+            total_profit = 0
+            for idx in actual.index:
+                pred_col = pred_outcome_idx[idx] if idx in pred_outcome_idx.index else None
+                if pd.isna(pred_col):
+                    continue
+
+                pred_prob = df.loc[idx, pred_col] if pred_col in df.columns else None
+                if pd.isna(pred_prob):
+                    continue
+
+                # Convert percentage if needed
+                if isinstance(pred_prob, str):
+                    pred_prob = float(pred_prob.strip('%')) / 100
+
+                # Fair odds
+                fair_odds = 1 / pred_prob if pred_prob > 0 else 1.0
+
+                # Apply bookmaker margin to reduce odds (CONSERVATIVE)
+                # Bookmaker reduces payout by margin percentage
+                bookmaker_odds = fair_odds * (1 - margin)
+
+                # Check if prediction was correct
+                was_correct = (predicted[idx] == actual[idx])
+
+                if was_correct:
+                    total_profit += (bookmaker_odds - 1)  # Win at reduced odds
+                else:
+                    total_profit += -1  # Loss: lose stake
+
+            roi = (total_profit / total * 100) if total > 0 else 0
+
             results['markets'][market_name] = {
                 'total': int(total),
                 'correct': int(correct),
@@ -579,18 +651,51 @@ class BacktestEngine:
         print("\n" + "="*60)
         print(" LEAGUE + MARKET BREAKDOWN")
         print("="*60)
-        
-        # Collect all predictions with league info
-        all_preds = []
-        
-        for result in self.results:
-            # Need to track which predictions came from which league
-            # This requires storing more detail during evaluation
-            pass
-        
-        # For now, print instruction
-        print(" To see league breakdowns, check backtest_detailed.csv")
-        print("   Filter by League column to see market performance per league")
+
+        # Read detailed results from CSV
+        detailed_path = OUTPUT_DIR / "backtest_detailed.csv"
+        if not detailed_path.exists():
+            print(" No detailed results file found")
+            print("   Run backtest first to generate backtest_detailed.csv")
+            return
+
+        try:
+            df = pd.read_csv(detailed_path)
+        except pd.errors.EmptyDataError:
+            print(" Detailed results file is empty")
+            print("   No backtest data available for league breakdown")
+            return
+
+        if df.empty:
+            print(" No backtest data available for league breakdown")
+            return
+
+        # Group by League and Market
+        if 'league' in df.columns and 'market' in df.columns:
+            grouped = df.groupby(['league', 'market']).agg({
+                'total': 'sum',
+                'correct': 'sum',
+                'accuracy': 'mean'
+            }).reset_index()
+
+            grouped['accuracy_%'] = (grouped['correct'] / grouped['total'] * 100).round(1)
+
+            # Show top performers by league
+            print("\n Top Markets by League:")
+            for league in grouped['league'].unique():
+                league_data = grouped[grouped['league'] == league].sort_values('accuracy_%', ascending=False)
+                if len(league_data) > 0:
+                    best = league_data.iloc[0]
+                    print(f"\n   {league}: {best['market']} ({best['accuracy_%']:.1f}% accuracy)")
+                    print(f"      {best['correct']}/{best['total']} correct")
+
+            # Save league breakdown
+            league_breakdown_path = OUTPUT_DIR / "backtest_league_breakdown.csv"
+            grouped.to_csv(league_breakdown_path, index=False)
+            print(f"\n Saved league breakdown: {league_breakdown_path}")
+        else:
+            print(" League/Market columns not found in detailed results")
+            print("   This feature requires tracking league data during backtest")
     
     def analyze_combinations(self):
         """Analyze double/treble success rates"""
@@ -661,22 +766,37 @@ class BacktestEngine:
         print("   • Mix O/U with other markets for decorrelation")
     
     def export_detailed_results(self) -> Path:
-        """Export period-by-period breakdown"""
+        """Export period-by-period breakdown with league info"""
         detailed = []
-        
+
         for result in self.results:
             for market, stats in result.get('markets', {}).items():
+                # Include league info if available
+                league = result.get('league', 'Unknown')
+
                 detailed.append({
                     'period_start': result['period_start'],
                     'period_end': result['period_end'],
+                    'league': league,
                     'market': market,
                     **stats
                 })
-        
-        detailed_df = pd.DataFrame(detailed)
+
         output_path = OUTPUT_DIR / "backtest_detailed.csv"
+
+        if not detailed:
+            # Create empty CSV with headers
+            detailed_df = pd.DataFrame(columns=[
+                'period_start', 'period_end', 'league', 'market',
+                'total', 'correct', 'accuracy', 'brier_score', 'roi_pct'
+            ])
+            detailed_df.to_csv(output_path, index=False)
+            print(f" Warning: No backtest results to export (created empty file)")
+            return output_path
+
+        detailed_df = pd.DataFrame(detailed)
         detailed_df.to_csv(output_path, index=False)
-        
+
         print(f" Saved detailed: {output_path}")
         return output_path
 

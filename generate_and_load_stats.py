@@ -279,14 +279,22 @@ def generate_statistics(data_dir: Path = None,
             Path("data/raw"),
             Path("data"),
         ]
+
+        print(" Searching for historical CSV files...")
         for d in possible_dirs:
-            if d.exists() and list(d.glob("*.csv")):
+            csv_files = list(d.glob("*.csv"))
+            print(f"   Checking {d} (exists: {d.exists()}, CSVs: {len(csv_files)})")
+
+            if d.exists() and csv_files:
                 data_dir = d
-                print(f" Using data from: {data_dir}")
+                print(f" ✓ Using data from: {data_dir.resolve()}")
                 break
-        
+
         if data_dir is None:
-            print(" No CSV files found - skipping statistics generation")
+            print(" ✗ No CSV files found in any directory:")
+            for d in possible_dirs:
+                abs_d = d.resolve()
+                print(f"   - {abs_d} (exists: {abs_d.exists()})")
             print("   (This is OK for first run)")
             return False
     
