@@ -36,6 +36,47 @@ DEFAULT_DECAY = 400.0
 MAX_GOALS = 12  # Increased for better tail accuracy
 RECENT_FORM_WINDOW = 5  # Last 5 matches for form boost
 
+# ENHANCEMENT #3: Seasonal goal patterns (early/mid/late season adjustments)
+LEAGUE_SEASONAL_PATTERNS = {
+    'E0': {  # Premier League (38 games)
+        'early': (0, 10, 1.08),    # Matches 1-10: +8% goals (teams still gelling)
+        'mid': (11, 28, 1.00),     # Matches 11-28: baseline
+        'late': (29, 38, 0.95),    # Matches 29-38: -5% goals (fatigue, defensive)
+    },
+    'E1': {  # Championship (46 games)
+        'early': (0, 12, 1.10),    # Even more goals early (lower quality defences)
+        'mid': (13, 36, 1.00),
+        'late': (37, 46, 0.92),    # More fatigue due to longer season
+    },
+    'D1': {  # Bundesliga (34 games)
+        'early': (0, 9, 1.12),     # Bundesliga famous for high-scoring starts
+        'mid': (10, 26, 1.00),
+        'late': (27, 34, 0.94),    # Winter break effect wears off
+    },
+    'SP1': {  # La Liga (38 games)
+        'early': (0, 10, 1.05),    # Moderate early bump
+        'mid': (11, 28, 1.00),
+        'late': (29, 38, 0.96),    # Tight title races = cagey games
+    },
+    'I1': {  # Serie A (38 games)
+        'early': (0, 10, 1.06),
+        'mid': (11, 28, 1.00),
+        'late': (29, 38, 0.93),    # Most defensive late season
+    },
+    'F1': {  # Ligue 1 (38 games)
+        'early': (0, 10, 1.07),
+        'mid': (11, 28, 1.00),
+        'late': (29, 38, 0.95),
+    },
+}
+
+# Default seasonal pattern for leagues not specified above
+DEFAULT_SEASONAL_PATTERN = {
+    'early': (0, 8, 1.06),
+    'mid': (9, 30, 1.00),
+    'late': (31, 46, 0.96),
+}
+
 # ============================================================================
 # DATA STRUCTURES
 # ============================================================================
@@ -48,16 +89,45 @@ class DCParams:
     home_adv: float
     rho: float
     league: str
-    
+
     # NEW: Recent form multipliers
     recent_attack: Dict[str, float] = None
     recent_defence: Dict[str, float] = None
-    
+
     def __post_init__(self):
         if self.recent_attack is None:
             self.recent_attack = {}
         if self.recent_defence is None:
             self.recent_defence = {}
+
+# ============================================================================
+# ENHANCEMENT #3: Seasonal Adjustment Helper
+# ============================================================================
+
+def _get_seasonal_multiplier(league: str, match_number: Optional[int] = None) -> float:
+    """
+    Get seasonal goal adjustment multiplier based on match number in season.
+
+    Args:
+        league: League code (e.g., 'E0', 'D1')
+        match_number: Which match in the season (0-indexed, so match 0 = first match)
+
+    Returns:
+        Multiplier to apply to expected goals (e.g., 1.08 = +8% goals)
+    """
+    if match_number is None:
+        return 1.0  # No adjustment if match number unknown
+
+    # Get league-specific pattern or default
+    pattern = LEAGUE_SEASONAL_PATTERNS.get(league, DEFAULT_SEASONAL_PATTERN)
+
+    # Determine which phase we're in
+    for phase_name, (start, end, multiplier) in pattern.items():
+        if start <= match_number <= end:
+            return multiplier
+
+    # If beyond all phases (shouldn't happen), use late season multiplier
+    return pattern['late'][2]
 
 # ============================================================================
 # TIME WEIGHTING (ADAPTIVE)
@@ -319,41 +389,69 @@ def _score_grid(lam: float, mu: float, rho: float,
 # MATCH PRICING (ENHANCED)
 # ============================================================================
 
-def price_match(params: DCParams, home: str, away: str, 
+def price_match(params: DCParams, home: str, away: str,
                 use_form: bool = True,
-                max_goals: int = MAX_GOALS) -> Dict[str, float]:
+                max_goals: int = MAX_GOALS,
+                home_rest_days: Optional[int] = None,
+                away_rest_days: Optional[int] = None,
+                match_number: Optional[int] = None) -> Dict[str, float]:
     """
     Calculate probabilities for all markets with form adjustment
-    
+
     Args:
         params: Fitted DC parameters
         home: Home team name
         away: Away team name
         use_form: Whether to apply recent form adjustments
         max_goals: Maximum goals for calculations
-    
+        home_rest_days: Days since home team's last match (for fixture congestion adjustment)
+        away_rest_days: Days since away team's last match (for fixture congestion adjustment)
+        match_number: Which match in the season (0-indexed) for seasonal adjustment
+
     Returns:
         Dictionary of market probabilities
     """
     # Check if teams exist in params
     if home not in params.attack or away not in params.attack:
         return {}
-    
+
     # Base expected goals
     lam = np.exp(params.attack[home] - params.defence[away] + params.home_adv)
     mu = np.exp(params.attack[away] - params.defence[home])
-    
+
     # Apply recent form adjustments if available and requested
     if use_form and params.recent_attack:
         form_mult_home_att = params.recent_attack.get(home, 1.0)
         form_mult_away_att = params.recent_attack.get(away, 1.0)
         form_mult_home_def = params.recent_defence.get(home, 1.0)
         form_mult_away_def = params.recent_defence.get(away, 1.0)
-        
+
         # Adjust expected goals by form
         lam *= form_mult_home_att * (1 / form_mult_away_def)
         mu *= form_mult_away_att * (1 / form_mult_home_def)
-    
+
+    # ENHANCEMENT #1: Fixture Congestion Adjustment (Rest Days)
+    # Research shows teams with short rest score significantly fewer goals
+    if home_rest_days is not None:
+        if home_rest_days < 4:
+            lam *= 0.88  # 12% reduction for short rest (<4 days)
+        elif home_rest_days < 7:
+            lam *= 0.95  # 5% reduction for medium rest (4-6 days)
+        # 7+ days = no adjustment (normal rest)
+
+    if away_rest_days is not None:
+        if away_rest_days < 4:
+            mu *= 0.88  # 12% reduction for short rest
+        elif away_rest_days < 7:
+            mu *= 0.95  # 5% reduction for medium rest
+
+    # ENHANCEMENT #3: Seasonal Pattern Adjustment
+    # Goals vary by season phase (early/mid/late)
+    seasonal_mult = _get_seasonal_multiplier(params.league, match_number)
+    if seasonal_mult != 1.0:
+        lam *= seasonal_mult
+        mu *= seasonal_mult
+
     # Generate score probability grid
     P = _score_grid(lam, mu, params.rho, max_goals)
     
@@ -368,71 +466,21 @@ def price_match(params: DCParams, home: str, away: str,
     out['DC_BTTS_Y'] = P[1:, 1:].sum()
     out['DC_BTTS_N'] = 1 - out['DC_BTTS_Y']
     
-    # Over/Under lines (CRITICAL FOR O/U ACCURACY)
+    # Over/Under lines (0.5 to 5.5 goal lines only)
     S = np.add.outer(np.arange(P.shape[0]), np.arange(P.shape[1]))
-    
-    for line in [0.5, 1.5, 2.5, 3.5, 4.5]:
+
+    for line in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
         line_str = str(line).replace('.', '_')
-        
+
         over_prob = P[S > line].sum()
         under_prob = P[S < line].sum()
-        
+
         # Handle exactly on line (push in some markets)
         on_line_prob = P[S == line].sum()
-        
+
         # For X.5 lines, no push possible
         out[f'DC_OU_{line_str}_O'] = over_prob
         out[f'DC_OU_{line_str}_U'] = under_prob + on_line_prob
-    
-    # Asian Handicap lines
-    ah_lines = [-1.0, -0.5, 0.0, 0.5, 1.0]
-    for line in ah_lines:
-        if line < 0:
-            line_key = f"-{abs(line)}".replace('.', '_')
-        else:
-            line_key = f"+{line}".replace('.', '_') if line > 0 else "0_0"
-        
-        home_wins = away_wins = pushes = 0.0
-        
-        for h in range(P.shape[0]):
-            for a in range(P.shape[1]):
-                adjusted_diff = h - a - line
-                prob = P[h, a]
-                
-                if adjusted_diff > 0:
-                    home_wins += prob
-                elif adjusted_diff < 0:
-                    away_wins += prob
-                else:
-                    pushes += prob
-        
-        out[f'DC_AH_{line_key}_H'] = home_wins
-        out[f'DC_AH_{line_key}_A'] = away_wins
-        out[f'DC_AH_{line_key}_P'] = pushes
-    
-    # Goal Ranges
-    out['DC_GR_0'] = P[S == 0].sum()
-    out['DC_GR_1'] = P[S == 1].sum()
-    out['DC_GR_2'] = P[S == 2].sum()
-    out['DC_GR_3'] = P[S == 3].sum()
-    out['DC_GR_4'] = P[S == 4].sum()
-    out['DC_GR_5+'] = P[S >= 5].sum()
-    
-    # Correct Scores (0-0 to 5-5 plus Other)
-    for h in range(6):
-        for a in range(6):
-            if h < P.shape[0] and a < P.shape[1]:
-                out[f'DC_CS_{h}_{a}'] = P[h, a]
-            else:
-                out[f'DC_CS_{h}_{a}'] = 0.0
-    
-    # Other scores (6+ goals for either team)
-    other_prob = 0.0
-    for h in range(P.shape[0]):
-        for a in range(P.shape[1]):
-            if h >= 6 or a >= 6:
-                other_prob += P[h, a]
-    out['DC_CS_Other'] = other_prob
     
     # Additional O/U diagnostics (for analysis)
     out['_expected_total_goals'] = lam + mu

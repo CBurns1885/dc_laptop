@@ -1,47 +1,33 @@
-# ordinal.py
-import numpy as np
-from sklearn.linear_model import LogisticRegression
+# ordinal.py - STUB for DC-ONLY system
+"""
+Minimal stub for ordinal regression - not used in DC-only system
+BTTS and O/U are binary markets, not ordinal
+"""
 
-class CORALOrdinal:
-    """
-    Simple CORAL: K ordered classes -> K-1 binary heads with shared weights.
-    Predicts cumulative probabilities, then converts to class probabilities.
-    """
+import numpy as np
+from sklearn.base import BaseEstimator, ClassifierMixin
+
+class CORALOrdinal(BaseEstimator, ClassifierMixin):
+    """Stub CORAL ordinal regression classifier - not used in DC-only"""
     def __init__(self, C=1.0, max_iter=2000):
         self.C = C
         self.max_iter = max_iter
-        self.clfs = []
-        self.thresholds_ = None
         self.classes_ = None
 
-    def fit(self, X, y_ord):
-        self.classes_ = np.unique(y_ord)
-        K = len(self.classes_)
-        self.clfs = []
-        for k in range(K-1):
-            yk = (y_ord > k).astype(int)
-            clf = LogisticRegression(C=self.C, max_iter=self.max_iter, n_jobs=-1)
-            clf.fit(X, yk)
-            self.clfs.append(clf)
+    def fit(self, X, y):
+        """Stub fit - does minimal initialization"""
+        self.classes_ = np.unique(y)
+        self.n_classes_ = len(self.classes_)
         return self
 
     def predict_proba(self, X):
-        K = len(self.classes_)
-        if K == 2:
-            p1 = self.clfs[0].predict_proba(X)[:,1]
-            P = np.vstack([1-p1, p1]).T
-            return P
-        cum = []
-        for clf in self.clfs:
-            cum.append(clf.predict_proba(X)[:,1])
-        cum = np.clip(np.vstack(cum).T, 1e-9, 1-1e-9)  # shape (n, K-1)
-        # Convert cumulative to class probs
-        n = X.shape[0]
-        P = np.zeros((n, K))
-        P[:,0] = 1 - cum[:,0]
-        for k in range(1, K-1):
-            P[:,k] = cum[:,k-1] - cum[:,k]
-        P[:,K-1] = cum[:,K-2]
-        # normalize for safety
-        s = P.sum(axis=1, keepdims=True); s[s==0]=1.0
-        return P / s
+        """Stub predict_proba - returns uniform distribution"""
+        n_samples = X.shape[0] if hasattr(X, 'shape') else len(X)
+        n_classes = self.n_classes_ if self.n_classes_ else 2
+        # Return uniform probabilities
+        return np.ones((n_samples, n_classes)) / n_classes
+
+    def predict(self, X):
+        """Stub predict - returns first class"""
+        n_samples = X.shape[0] if hasattr(X, 'shape') else len(X)
+        return np.repeat(self.classes_[0], n_samples)

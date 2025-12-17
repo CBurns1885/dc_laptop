@@ -67,9 +67,13 @@ from config import (
     DATA_DIR, OUTPUT_DIR, MODEL_ARTIFACTS_DIR, FEATURES_PARQUET, RANDOM_SEED, log_header
 )
 from progress_utils import Timer, heartbeat
+
+# DC-ONLY: These imports are stubs - not used in Dixon-Coles workflow
+# They're here for backwards compatibility with legacy ML code paths
 from tuning import make_time_split, objective_factory, CVData
 from ordinal import CORALOrdinal
 from calibration import DirichletCalibrator, TemperatureScaler
+
 from models_dc import fit_all as dc_fit_all, price_match as dc_price_match
 
 
@@ -104,45 +108,32 @@ def train_all_targets(models_dir: Path = MODEL_ARTIFACTS_DIR) -> Dict[str, Train
                 mode_val = df[col].mode()
                 df[col] = df[col].fillna(mode_val[0] if len(mode_val) > 0 else 'Unknown')
     
-    print(f"✅ NaN values handled")
+    print(f" NaN values handled")
     
     # Continue with rest of function...
     models: Dict[str, TrainedTarget] = {}
 
 # --------------------------------------------------------------------------------------
-# Targets definition
+# Targets definition - DC-ONLY with BTTS and O/U (0.5-5.5)
 # --------------------------------------------------------------------------------------
-OU_LINES = ["0_5","1_5","2_5","3_5","4_5"]
-#AH_LINES = ["-1_0","-0_5","0_0","+0_5","+1_0"]
+OU_LINES = ["0_5","1_5","2_5","3_5","4_5","5_5"]
 
 def _all_targets() -> List[str]:
+    """Only BTTS and Over/Under goal lines 0.5-5.5 using Dixon-Coles model"""
     t = [
-        "y_1X2","y_BTTS","y_GOAL_RANGE","y_CS",
+        "y_BTTS",
         *(f"y_OU_{l}" for l in OU_LINES),
-        #*(f"y_AH_{l}" for l in AH_LINES),
-        "y_HT","y_HTFT",
-       # *(f"y_HomeTG_{l}" for l in ["0_5","1_5","2_5","3_5"]),
-        #*(f"y_AwayTG_{l}" for l in ["0_5","1_5","2_5","3_5"]),
-        #"y_HomeCardsY_BAND","y_AwayCardsY_BAND",
-        #"y_HomeCorners_BAND","y_AwayCorners_BAND",
     ]
     return t
 
-# banded/ordered targets → use ordinal model
-ORDINAL_TARGETS = {
-    "y_GOAL_RANGE": ["0","1","2","3","4","5+"],
-    "y_HomeCardsY_BAND": ["0-2","3","4-5","6+"],
-    "y_AwayCardsY_BAND": ["0-2","3","4-5","6+"],
-    "y_HomeCorners_BAND": ["0-3","4-5","6-7","8-9","10+"],
-    "y_AwayCorners_BAND": ["0-3","4-5","6-7","8-9","10+"],
-}
+# No ordinal targets needed for DC-only BTTS+OU
+ORDINAL_TARGETS = {}
 
-# targets where DC can produce probabilities
+# targets where DC can produce probabilities - only BTTS and OU now
 def _dc_supported(t: str) -> bool:
     return (
-        t in ["y_1X2","y_BTTS","y_GOAL_RANGE","y_CS"]
+        t == "y_BTTS"
         or t.startswith("y_OU_")
-        or t.startswith("y_AH_")
     )
 
 
@@ -427,28 +418,39 @@ def _tune_model(alg: str, X: np.ndarray, y: np.ndarray, classes_: np.ndarray) ->
 # DC probabilities helper (for OOF & inference)
 # --------------------------------------------------------------------------------------
 def _dc_probs_for_rows(train_df: pd.DataFrame, rows_df: pd.DataFrame, target: str, max_goals=8) -> np.ndarray:
+    """DC probabilities for BTTS and O/U markets only"""
     params = dc_fit_all(train_df[["League","Date","HomeTeam","AwayTeam","FTHG","FTAG"]])
     out = []
-    for _, r in rows_df[["League","HomeTeam","AwayTeam"]].iterrows():
+
+    # Prepare column list - include rest days and match_number if available
+    cols = ["League","HomeTeam","AwayTeam"]
+    if "home_rest_days" in rows_df.columns:
+        cols.append("home_rest_days")
+    if "away_rest_days" in rows_df.columns:
+        cols.append("away_rest_days")
+    if "match_number" in rows_df.columns:
+        cols.append("match_number")
+
+    for _, r in rows_df[cols].iterrows():
         lg, ht, at = r["League"], r["HomeTeam"], r["AwayTeam"]
+
+        # Extract rest days if available (ENHANCEMENT #1)
+        home_rest = r.get("home_rest_days", None) if "home_rest_days" in r else None
+        away_rest = r.get("away_rest_days", None) if "away_rest_days" in r else None
+
+        # Extract match number if available (ENHANCEMENT #3)
+        match_num = r.get("match_number", None) if "match_number" in r else None
+
         mp = {}
         if lg in params:
-            mp = dc_price_match(params[lg], ht, at, max_goals=max_goals)
-        if target == "y_1X2":
-            vec = [mp.get("DC_1X2_H",0.0), mp.get("DC_1X2_D",0.0), mp.get("DC_1X2_A",0.0)]
-        elif target == "y_BTTS":
+            mp = dc_price_match(params[lg], ht, at, max_goals=max_goals,
+                               home_rest_days=home_rest, away_rest_days=away_rest,
+                               match_number=match_num)
+        if target == "y_BTTS":
             vec = [mp.get("DC_BTTS_N",0.0), mp.get("DC_BTTS_Y",0.0)]
-        elif target == "y_GOAL_RANGE":
-            labs = ["0","1","2","3","4","5+"]
-            vec = [mp.get(f"DC_GR_{k}",0.0) for k in labs]
-        elif target == "y_CS":
-            vec = [mp.get(f"DC_CS_{a}_{b}",0.0) for a in range(6) for b in range(6)] + [mp.get("DC_CS_Other",0.0)]
         elif target.startswith("y_OU_"):
             l = target.split("_")[-1]
             vec = [mp.get(f"DC_OU_{l}_U",0.0), mp.get(f"DC_OU_{l}_O",0.0)]
-        elif target.startswith("y_AH_"):
-            l = target.split("_",2)[2]
-            vec = [mp.get(f"DC_AH_{l}_A",0.0), mp.get(f"DC_AH_{l}_P",0.0), mp.get(f"DC_AH_{l}_H",0.0)]
         else:
             vec = None
         out.append(vec)
@@ -473,7 +475,7 @@ def _fit_single_target(df: pd.DataFrame, target_col: str) -> TrainedTarget:
     if sub.empty:
         raise RuntimeError(f"No data for target {target_col}")
     if df[target_col].isna().all():
-        print(f"⚠️ Skipping {target_col} - no data available")
+        print(f" Skipping {target_col} - no data available")
         return None
     
     error_count = 0
@@ -487,80 +489,37 @@ def _fit_single_target(df: pd.DataFrame, target_col: str) -> TrainedTarget:
     min_class_count = class_counts.min()
     
     if min_class_count < 5:
-        print(f"⚠️ Skipping {target_col} - class has only {min_class_count} sample(s), need minimum 5 for CV")
+        print(f" Skipping {target_col} - class has only {min_class_count} sample(s), need minimum 5 for CV")
         return None
     
     if len(classes) > 50:
-        print(f"⚠️ Skipping {target_col} - too many classes ({len(classes)}), max 50 supported")
+        print(f" Skipping {target_col} - too many classes ({len(classes)}), max 50 supported")
         return None
     pre = _preprocessor(sub)
     X_all = pre.fit_transform(sub)
     feature_names = [*(pre.transformers_[0][2] or []), *(pre.transformers_[1][2] or [])]
-
-    # ===== SPECIALIZED MODEL SELECTION =====
-    # Use optimized models for specific market types
-    use_specialized = _HAS_SPECIALIZED and os.environ.get("USE_SPECIALIZED", "1") == "1"
     
-    if use_specialized and is_binary_market(target_col):
-        # Binary markets: O/U, BTTS - use specialized binary model
-        print(f"  🎯 Using BINARY specialized model")
-        specialist = BinaryMarketModel(target_col, random_state=RANDOM_SEED)
-        specialist.fit(X_all, y_int)
-        base_models = {"binary_specialist": specialist}
-        
-    elif use_specialized and is_ordinal_market(target_col):
-        # Ordinal markets: Goal Range, CS - use specialized ordinal model
-        print(f"  📊 Using ORDINAL specialized model")
-        specialist = OrdinalMarketModel(target_col, classes, random_state=RANDOM_SEED)
-        specialist.fit(X_all, y_int)
-        base_models = {"ordinal_specialist": specialist}
-        
-    elif use_specialized and is_multiclass_market(target_col):
-        # Multiclass markets: 1X2, HT, HTFT - use specialized multiclass model
-        print(f"  🔢 Using MULTICLASS specialized model")
-        specialist = MulticlassMarketModel(target_col, len(classes), random_state=RANDOM_SEED)
-        specialist.fit(X_all, y_int)
-        base_models = {"multiclass_specialist": specialist}
-        
-    else:
-        # Standard model selection for other targets or if specialized disabled
-        print(f"  ⚙️ Using standard ensemble models")
-        
-        # Choose base learners based on user choice
-        if os.environ.get("MODELS_ONLY") == "rf":
-            base_names = ["rf"]  # Ultra fast mode
-        else:
-            base_names = ["rf","et","lr"]
-            if _HAS_XGB: base_names.append("xgb")
-            if _HAS_LGB: base_names.append("lgb")
-            if _HAS_CAT: base_names.append("cat")
-            if _HAS_TORCH: base_names.append("bnn")
+    # IMPORTANT: Preprocessor may drop rows - align all arrays
+    if X_all.shape[0] != len(y_int):
+        print(f"   WARNING: Preprocessor dropped {len(y_int) - X_all.shape[0]} rows")
+        # Get valid indices (rows not dropped by preprocessor)
+        valid_idx = sub.index[:X_all.shape[0]]
+        sub = sub.loc[valid_idx].reset_index(drop=True)
+        y = sub[target_col].astype("category")
+        classes = list(y.cat.categories)
+        y_int = y.cat.codes.values
 
-        # Optuna tune a subset (time-aware CV)
-        tuned: Dict[str, object] = {}
-        for alg in ["rf","et","xgb","lgb","cat","lr"]:
-            if alg in base_names:
-                with Timer(f"Optuna tune {alg} for {target_col}"):
-                    tuned[alg] = _tune_model(alg, X_all, y_int, np.array(classes))
+    # ===== DIXON-COLES ONLY =====
+    # For DC-only BTTS and O/U implementation, we only use the DC model
+    print(f"   Using Dixon-Coles model ONLY (no ensemble)")
 
-        # Build base models dict (use tuned where present, else defaults)
-        base_models: Dict[str, object] = {}
-        for name in base_names:
-            if name in tuned:
-                base_models[name] = tuned[name]
-            else:
-                base_models[name] = _build_base_model(name, n_classes=len(classes), feature_names=feature_names)
-
-        # If ordinal target, replace tree/linear with CORAL ordinal
-        if target_col in ORDINAL_TARGETS:
-            K = len(ORDINAL_TARGETS[target_col])
-            coral = CORALOrdinal(C=1.0, max_iter=2000)
-            base_models = {"coral": coral}
-
-    # Add DC pseudo-base if supported
+    base_models = {}
     supports_dc = _dc_supported(target_col)
     if supports_dc:
         base_models["dc"] = "__DC__"
+    else:
+        print(f"   Target {target_col} not supported by DC model")
+        return None
 
     # Walk-forward OOF
     ps = make_time_split(len(y_int), n_folds=5)
@@ -573,7 +532,7 @@ def _fit_single_target(df: pd.DataFrame, target_col: str) -> TrainedTarget:
         fold_stack = []
         for name, model in base_models.items():
             if name == "dc":
-                proba = _dc_probs_for_rows(sub.iloc[tr], sub.iloc[va], target_col)
+                proba = _dc_probs_for_rows(sub[tr].reset_index(drop=True), sub[va].reset_index(drop=True), target_col)
             else:
                 m = model
                 # Fit fresh copy per fold to keep OOF strict
@@ -678,22 +637,35 @@ def train_all_targets(models_dir: Path = MODEL_ARTIFACTS_DIR) -> Dict[str, Train
     targets = [t for t in _all_targets() if t in df.columns]
     start_time = time.time()
 
+    print(f"\n{'='*60}")
+    print(f"Training {len(targets)} targets on {len(df)} matches")
+    print(f"{'='*60}\n")
+
     for i, t in enumerate(targets, 1):
+        target_start = time.time()
         log_header(f"TRAIN {t} ({i}/{len(targets)})")
         sub = df.dropna(subset=[t])
         if sub.empty:
+            print(f"   SKIPPED - No data")
             continue
-        trg = _fit_single_target(df, t)
+
+        print(f"   Training on {len(sub)} matches...")
+        trg = _fit_single_target(sub, t)
         if trg is None:
+            print(f"   SKIPPED - Model returned None")
             continue
+
+        target_elapsed = time.time() - target_start
+        print(f"   Saving model... ({target_elapsed:.1f}s)")
         joblib.dump(trg, models_dir / f"{t}.joblib", compress=3)
         models[t] = trg
-        
-        # Time estimate
+
+        # Progress and time estimate
         elapsed = time.time() - start_time
         avg_per_target = elapsed / i
         remaining = avg_per_target * (len(targets) - i)
-        print(f"⏱️ Est. {remaining/3600:.1f}h remaining ({i}/{len(targets)} done)")
+        pct = (i / len(targets)) * 100
+        print(f"   [{pct:.0f}%] Completed in {target_elapsed:.1f}s | Remaining: {remaining/60:.1f}min ({i}/{len(targets)} done)\n")
     
     # save manifest
     with open(models_dir / "manifest.json", "w") as f:

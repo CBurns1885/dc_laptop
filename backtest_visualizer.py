@@ -27,17 +27,17 @@ class BacktestVisualizer:
         """Load backtest results"""
         if self.summary_path.exists():
             self.summary_df = pd.read_csv(self.summary_path, index_col=0)
-            print(f"✅ Loaded summary: {len(self.summary_df)} markets")
+            print(f" Loaded summary: {len(self.summary_df)} markets")
         
         if self.detailed_path.exists():
             self.detailed_df = pd.read_csv(self.detailed_path)
             self.detailed_df['period_start'] = pd.to_datetime(self.detailed_df['period_start'])
-            print(f"✅ Loaded detailed: {len(self.detailed_df)} periods")
+            print(f" Loaded detailed: {len(self.detailed_df)} periods")
     
     def plot_accuracy_by_market(self, save_path: Path = None):
         """Bar chart of accuracy by market"""
         if self.summary_df is None or self.summary_df.empty:
-            print("⚠️ No summary data to plot")
+            print(" No summary data to plot")
             return
         
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -65,7 +65,7 @@ class BacktestVisualizer:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"✅ Saved: {save_path}")
+            print(f" Saved: {save_path}")
         else:
             plt.show()
         
@@ -94,7 +94,7 @@ class BacktestVisualizer:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"✅ Saved: {save_path}")
+            print(f" Saved: {save_path}")
         else:
             plt.show()
         
@@ -129,7 +129,7 @@ class BacktestVisualizer:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"✅ Saved: {save_path}")
+            print(f" Saved: {save_path}")
         else:
             plt.show()
         
@@ -167,7 +167,7 @@ class BacktestVisualizer:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"✅ Saved: {save_path}")
+            print(f" Saved: {save_path}")
         else:
             plt.show()
         
@@ -198,7 +198,7 @@ class BacktestVisualizer:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"✅ Saved: {save_path}")
+            print(f" Saved: {save_path}")
         else:
             plt.show()
         
@@ -230,7 +230,7 @@ class BacktestVisualizer:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"✅ Saved: {save_path}")
+            print(f" Saved: {save_path}")
         else:
             plt.show()
         
@@ -238,7 +238,7 @@ class BacktestVisualizer:
     
     def generate_all_charts(self, output_dir: Path = Path("outputs")):
         """Generate all visualization charts"""
-        print("\n📊 GENERATING BACKTEST VISUALIZATIONS")
+        print("\n GENERATING BACKTEST VISUALIZATIONS")
         print("="*50)
         
         output_dir.mkdir(exist_ok=True)
@@ -250,13 +250,13 @@ class BacktestVisualizer:
         self.plot_brier_score_comparison(output_dir / "backtest_calibration.png")
         self.plot_performance_heatmap(output_dir / "backtest_heatmap.png")
         
-        print("\n✅ All charts generated!")
-        print(f"📂 Saved to: {output_dir}/")
+        print("\n All charts generated!")
+        print(f" Saved to: {output_dir}/")
     
     def generate_html_report(self, output_path: Path = Path("outputs/backtest_report.html")):
         """Generate interactive HTML report"""
         if self.summary_df is None:
-            print("⚠️ No data for report")
+            print(" No data for report")
             return
         
         html = f"""
@@ -281,11 +281,11 @@ class BacktestVisualizer:
     </style>
 </head>
 <body>
-    <h1>🔬 Backtest Performance Report</h1>
+    <h1> Backtest Performance Report</h1>
     <p>Generated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
     
     <div class="summary">
-        <h2>📊 Overall Summary</h2>
+        <h2> Overall Summary</h2>
 """
         
         # Overall metrics
@@ -314,7 +314,7 @@ class BacktestVisualizer:
     </div>
     
     <div class="summary">
-        <h2>📈 Market Performance</h2>
+        <h2> Market Performance</h2>
         <table>
             <tr>
                 <th>Market</th>
@@ -344,7 +344,7 @@ class BacktestVisualizer:
     </div>
     
     <div class="summary">
-        <h2>📊 Visualizations</h2>
+        <h2> Visualizations</h2>
         <img src="backtest_accuracy.png" alt="Accuracy by Market">
         <img src="backtest_roi.png" alt="ROI by Market">
         <img src="backtest_accuracy_trends.png" alt="Accuracy Trends">
@@ -360,7 +360,7 @@ class BacktestVisualizer:
         with open(output_path, 'w') as f:
             f.write(html)
         
-        print(f"✅ HTML report generated: {output_path}")
+        print(f" HTML report generated: {output_path}")
 
 
 # ============================================================================
@@ -368,7 +368,7 @@ class BacktestVisualizer:
 # ============================================================================
 
 if __name__ == "__main__":
-    print("📊 Backtest Visualizer")
+    print(" Backtest Visualizer")
     print("="*50)
     
     viz = BacktestVisualizer()
@@ -377,7 +377,7 @@ if __name__ == "__main__":
         viz.generate_all_charts()
         viz.generate_html_report()
         
-        print("\n✅ Complete! Open backtest_report.html in your browser")
+        print("\n Complete! Open backtest_report.html in your browser")
     else:
-        print("❌ No backtest results found")
+        print(" No backtest results found")
         print("Run 'python run_backtest.py' first")

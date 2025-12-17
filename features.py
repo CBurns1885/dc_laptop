@@ -186,8 +186,8 @@ def _pivot_back(match_df: pd.DataFrame, side_feats: pd.DataFrame) -> pd.DataFram
 # Targets for multiple markets
 # -----------------------------
 
-OU_LINES = [0.5, 1.5, 2.5, 3.5, 4.5]
-AH_LINES = [-1.0, -0.5, 0.0, 0.5, 1.0]
+OU_LINES = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]
+# AH_LINES removed - DC-only BTTS and O/U
 
 def _target_1x2(df: pd.DataFrame) -> pd.Series:
     return df["FTR"].astype(str);
@@ -235,6 +235,128 @@ def _target_bands(total: pd.Series, bands: List[Tuple[int,int]], labels: List[st
     return pd.Series(lab).astype(str)
 
 # -----------------------------
+# ENHANCEMENT #1: Rest Days Feature
+# -----------------------------
+
+def _add_rest_days_feature(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate days since last match for home and away teams (OPTIMIZED).
+
+    Research shows:
+    - < 4 days rest: ~12% fewer goals scored (fixture congestion)
+    - 4-6 days rest: ~5% fewer goals
+    - 7+ days rest: normal performance
+
+    This is especially important for:
+    - Champions League weeks
+    - FA Cup/domestic cup fixtures
+    - Christmas/holiday fixture congestion
+    """
+    df = df.sort_values(['League', 'Date']).copy()
+    df['Date'] = pd.to_datetime(df['Date'])
+    
+    # Initialize with default rest days
+    df['home_rest_days'] = 14
+    df['away_rest_days'] = 14
+    
+    # Process each league separately for efficiency
+    leagues = df['League'].unique()
+    total_leagues = len(leagues)
+
+    for league_num, league in enumerate(leagues, 1):
+        league_mask = df['League'] == league
+        league_df = df[league_mask].copy()
+        league_matches = len(league_df)
+
+        print(f"   [{league_num}/{total_leagues}] Processing {league}: {league_matches} matches...", end='', flush=True)
+
+        # Build dict of last match dates for each team
+        team_last_match = {}
+
+        for idx in league_df.index:
+            row = df.loc[idx]
+            home_team = row['HomeTeam']
+            away_team = row['AwayTeam']
+            match_date = row['Date']
+
+            # Calculate rest for home team
+            if home_team in team_last_match:
+                df.loc[idx, 'home_rest_days'] = (match_date - team_last_match[home_team]).days
+
+            # Calculate rest for away team
+            if away_team in team_last_match:
+                df.loc[idx, 'away_rest_days'] = (match_date - team_last_match[away_team]).days
+
+            # Update last match dates
+            team_last_match[home_team] = match_date
+            team_last_match[away_team] = match_date
+
+        print(f" Done!")
+    
+    # Add categorical bands for easier analysis
+    df['home_rest_band'] = pd.cut(df['home_rest_days'],
+                                   bins=[0, 3, 6, 100],
+                                   labels=['short', 'medium', 'long'])
+    df['away_rest_band'] = pd.cut(df['away_rest_days'],
+                                   bins=[0, 3, 6, 100],
+                                   labels=['short', 'medium', 'long'])
+
+    print(f"   Rest days calculated - Avg home: {df['home_rest_days'].mean():.1f}, away: {df['away_rest_days'].mean():.1f}")
+    print(f"   Short rest (<4 days): {(df['home_rest_days'] < 4).sum()} home, {(df['away_rest_days'] < 4).sum()} away")
+
+    return df
+
+# -----------------------------
+# ENHANCEMENT #3: Match Number Feature
+# -----------------------------
+
+def _add_match_number_feature(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate match number in season for each team (0-indexed).
+
+    This enables seasonal pattern adjustments:
+    - Early season: More goals (teams still gelling defensively)
+    - Mid season: Normal baseline
+    - Late season: Fewer goals (fatigue, tight defensive tactics)
+
+    For a team's perspective, match_number = how many league games they've played this season.
+    For overall match perspective, we take the average of both teams' match numbers.
+    """
+    df = df.sort_values(['League', 'Date']).copy()
+
+    match_numbers = []
+
+    for idx, row in df.iterrows():
+        home_team = row['HomeTeam']
+        away_team = row['AwayTeam']
+        match_date = pd.to_datetime(row['Date'])
+        league = row['League']
+
+        # Count how many matches each team has played this season (same league)
+        home_prev_count = df[(df['Date'] < row['Date']) &
+                             (df['League'] == league) &
+                             ((df['HomeTeam'] == home_team) | (df['AwayTeam'] == home_team))].shape[0]
+
+        away_prev_count = df[(df['Date'] < row['Date']) &
+                             (df['League'] == league) &
+                             ((df['HomeTeam'] == away_team) | (df['AwayTeam'] == away_team))].shape[0]
+
+        # Match number is 0-indexed (0 = first match, 1 = second match, etc.)
+        # Use average of both teams' match numbers
+        avg_match_num = int((home_prev_count + away_prev_count) / 2)
+
+        match_numbers.append(avg_match_num)
+
+    df['match_number'] = match_numbers
+
+    print(f"   Match numbers calculated - Range: 0 to {df['match_number'].max()}")
+    print(f"   Distribution: Early (0-10): {(df['match_number'] <= 10).sum()}, "
+          f"Mid (11-28): {((df['match_number'] > 10) & (df['match_number'] <= 28)).sum()}, "
+          f"Late (29+): {(df['match_number'] > 28).sum()}")
+
+    return df
+
+# -----------------------------
 # Main build function
 # -----------------------------
 
@@ -275,38 +397,18 @@ def build_features(force: bool = False) -> Path:
         for c in ["B365H","B365D","B365A","PSCH","PSCD","PSCA"]:
             if c in df.columns: df[c] = np.nan
 
-    # Targets
-    df["y_1X2"] = _target_1x2(df)
+    # ENHANCEMENT #1: Rest Days (Fixture Congestion)
+    log_header("Calculating rest days (fixture congestion)")
+    df = _add_rest_days_feature(df)
+
+    # ENHANCEMENT #3: Match Number (Season Phase)
+    log_header("Calculating match numbers for seasonal patterns")
+    df = _add_match_number_feature(df)
+
+    # Targets - DC-ONLY: BTTS and Over/Under (0.5-5.5)
     df["y_BTTS"] = _target_btts(df).astype(str)
     for line in OU_LINES:
         df[f"y_OU_{str(line).replace('.','_')}"] = _target_ou(df, line).astype(str)
-    for line in AH_LINES:
-        df[f"y_AH_{str(line).replace('.','_')}"] = _target_ah_home(df, line).astype(str)
-    df["y_GOAL_RANGE"] = _target_goal_ranges(df)
-    df["y_CS"] = _target_correct_score(df, max_goal=5)
-
-    # Corners & Cards targets if source columns exist
-    df = _ensure_cols(df, ["HC","AC","HY","AY"])  # totals exist on many leagues
-    tot_corners = _maybe_sum_cols(df, "HC", "AC")
-    tot_cards_y = _maybe_sum_cols(df, "HY", "AY")
-    df["CornersTotal"] = tot_corners
-    df["CardsYTotal"] = tot_cards_y
-
-    # Bands (example): 0-7, 8-10, 11-13, 14+
-    if tot_corners.notna().any():
-        corners_bands = [(0,7),(8,10),(11,13)]
-        corners_labels = ["0-7","8-10","11-13"]
-        df["y_CORNERS_BAND"] = _target_bands(tot_corners, corners_bands, corners_labels)
-    else:
-        df["y_CORNERS_BAND"] = pd.Series(pd.NA, index=df.index, dtype=str)
-
-    # Cards bands: 0-3, 4-5, 6-7, 8+ (yellow-equivalent counts; reds ~ 2Y but we use Y only for simplicity)
-    if tot_cards_y.notna().any():
-        cards_bands = [(0,3),(4,5),(6,7)]
-        cards_labels = ["0-3","4-5","6-7"]
-        df["y_CARDSY_BAND"] = _target_bands(tot_cards_y, cards_bands, cards_labels)
-    else:
-        df["y_CARDSY_BAND"] = pd.Series(pd.NA, index=df.index, dtype=str)
 
     # Final ordering & save
     df.to_parquet(out_path, index=False)

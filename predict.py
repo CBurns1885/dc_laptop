@@ -23,11 +23,13 @@ from config import FEATURES_PARQUET, OUTPUT_DIR, MODEL_ARTIFACTS_DIR, log_header
 from models import load_trained_targets, predict_proba as model_predict
 from dc_predict import build_dc_for_fixtures
 from progress_utils import heartbeat
-from blending import BLEND_WEIGHTS_JSON
+
+# DC-ONLY: Blending removed, define path for legacy code compatibility
+BLEND_WEIGHTS_JSON = OUTPUT_DIR / "blend_weights.json"
 
 ID_COLS = ["League","Date","HomeTeam","AwayTeam"]
-OU_LINES = ["0_5","1_5","2_5","3_5","4_5"]
-AH_LINES = ["-1_0","-0_5","0_0","+0_5","+1_0"]
+OU_LINES = ["0_5","1_5","2_5","3_5","4_5","5_5"]
+AH_LINES = []  # DC-only BTTS and O/U (AH disabled)
 
 # League scoring profiles (learned from historical data)
 LEAGUE_PROFILES = {
@@ -250,7 +252,7 @@ def _build_future_frame(fixtures_csv: Path) -> pd.DataFrame:
     """Enhanced feature building with time weighting"""
     base = _load_base_features()
     fx = pd.read_csv(fixtures_csv)
-    fx["Date"] = pd.to_datetime(fx["Date"])
+    fx["Date"] = pd.to_datetime(fx["Date"], dayfirst=True, errors='coerce')
     
     # Add time weights for recent form emphasis
     current_date = datetime.now()
@@ -620,7 +622,7 @@ def _generate_html_for_top(top_df, parse_market_func, title_suffix=""):
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <title>🎯 ULTIMATE Predictions{title_suffix} - {len(top_df)} Elite Picks</title>
+    <title> ULTIMATE Predictions{title_suffix} - {len(top_df)} Elite Picks</title>
     <style>
         * {{box-sizing: border-box; margin: 0; padding: 0;}}
         body {{
@@ -724,7 +726,7 @@ def _generate_html_for_top(top_df, parse_market_func, title_suffix=""):
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🎯 ULTIMATE PREDICTIONS{title_suffix}</h1>
+            <h1> ULTIMATE PREDICTIONS{title_suffix}</h1>
             <p>{len(top_df)} Elite Picks - Sorted by Confidence & Probability</p>
         </div>
         <table>
@@ -789,7 +791,20 @@ def _generate_html_for_top(top_df, parse_market_func, title_suffix=""):
 
 def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = None):
     """Enhanced HTML report with confidence scores"""
-    prob_cols = [c for c in df.columns if c.startswith("BLEND_") or c.startswith("P_") or c.startswith("DC_")]
+    # Only use probability columns that have real data (not 0.0 or 1.0 defaults)
+    prob_cols = []
+    for c in df.columns:
+        if c.startswith("BLEND_") or c.startswith("DC_"):
+            prob_cols.append(c)
+        elif c.startswith("P_"):
+            # Only include P_ columns if they have realistic probabilities (not all 0 or 1)
+            values = df[c].dropna()
+            if len(values) > 0:
+                unique_vals = values.unique()
+                # Skip if column only has 0.0 and/or 1.0 (untrained model)
+                if not (len(unique_vals) <= 2 and all(v in [0.0, 1.0] for v in unique_vals)):
+                    prob_cols.append(c)
+
     if not prob_cols:
         print("Warning: No probability columns found")
         return
@@ -807,21 +822,22 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
     
     # Filter meaningful predictions
     meaningful = df2[(df2["BestProb"] > 0.5) & (df2["AvgConfidence"] > 0.5)]
-    
+
     if len(meaningful) >= 10:
-        top = meaningful.sort_values(["AvgConfidence", "BestProb"], ascending=[False, False]).head(50)
+        # Sort by Date, League, then by confidence and probability
+        top = meaningful.sort_values(["Date", "League", "AvgConfidence", "BestProb"], ascending=[True, True, False, False]).head(50)
     else:
-        top = df2.sort_values("BestProb", ascending=False).head(50)
+        top = df2.sort_values(["Date", "League", "BestProb"], ascending=[True, True, False]).head(50)
 
     # Also create a version excluding O/U 0.5 markets
     ou_05_columns = [c for c in prob_cols if 'OU_0_5' in c]
     if ou_05_columns:
         df_no_ou05 = df2.copy()
-        # Set O/U 0.5 probabilities to 0 so they won't be selected as BestMarket
-        for col in ou_05_columns:
-            df_no_ou05[col] = 0
-        df_no_ou05["BestProb"] = df_no_ou05[prob_cols].max(axis=1)
-        df_no_ou05["BestMarket"] = df_no_ou05[prob_cols].idxmax(axis=1)
+        # Create list of probability columns WITHOUT O/U 0.5
+        prob_cols_no_ou05 = [c for c in prob_cols if 'OU_0_5' not in c]
+        # Recalculate BestProb and BestMarket using only non-O/U 0.5 columns
+        df_no_ou05["BestProb"] = df_no_ou05[prob_cols_no_ou05].max(axis=1)
+        df_no_ou05["BestMarket"] = df_no_ou05[prob_cols_no_ou05].idxmax(axis=1)
 
         # Recalculate AvgConfidence excluding O/U 0.5
         if conf_cols:
@@ -830,9 +846,10 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
         meaningful_no_ou05 = df_no_ou05[(df_no_ou05["BestProb"] > 0.5) & (df_no_ou05["AvgConfidence"] > 0.5)]
 
         if len(meaningful_no_ou05) >= 10:
-            top_no_ou05 = meaningful_no_ou05.sort_values(["AvgConfidence", "BestProb"], ascending=[False, False]).head(50)
+            # Sort by Date, League, then by confidence and probability
+            top_no_ou05 = meaningful_no_ou05.sort_values(["Date", "League", "AvgConfidence", "BestProb"], ascending=[True, True, False, False]).head(50)
         else:
-            top_no_ou05 = df_no_ou05.sort_values("BestProb", ascending=False).head(50)
+            top_no_ou05 = df_no_ou05.sort_values(["Date", "League", "BestProb"], ascending=[True, True, False]).head(50)
     else:
         top_no_ou05 = None
 
@@ -865,229 +882,16 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
     
     # Generate HTML using helper function
     html = _generate_html_for_top(top, parse_market)
-    <style>
-        * {{box-sizing: border-box; margin: 0; padding: 0;}}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            color: #333;
-        }}
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }}
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-        }}
-        .header h1 {{
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        }}
-        .stats {{
-            background: #f8f9fa;
-            padding: 30px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            border-bottom: 3px solid #667eea;
-        }}
-        .stat-box {{
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }}
-        .stat-box .number {{
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 5px;
-        }}
-        .stat-box .label {{
-            color: #666;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-        }}
-        th, td {{
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }}
-        th {{
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #667eea;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }}
-        tr:hover {{
-            background: #f8f9fa;
-            transform: scale(1.01);
-            transition: all 0.2s;
-        }}
-        .rank {{
-            font-weight: bold;
-            color: #667eea;
-            font-size: 1.2em;
-        }}
-        .elite {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: bold;
-        }}
-        .high {{
-            background: #d4edda;
-        }}
-        .medium {{
-            background: #fff3cd;
-        }}
-        .prob {{
-            font-weight: bold;
-            font-size: 1.3em;
-            color: #dc3545;
-        }}
-        .confidence {{
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }}
-        .conf-high {{
-            background: #28a745;
-            color: white;
-        }}
-        .conf-med {{
-            background: #ffc107;
-            color: #333;
-        }}
-        .badge {{
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75em;
-            font-weight: bold;
-            margin-left: 5px;
-        }}
-        .badge-blend {{
-            background: #667eea;
-            color: white;
-        }}
-        @media print {{
-            body {{background: white; padding: 0;}}
-            .container {{box-shadow: none;}}
-        }}
-    </style>
-</head>
-<body>
-    <div class='container'>
-        <div class='header'>
-            <h1>🎯 ULTIMATE PREDICTIONS</h1>
-            <p style='font-size: 1.2em; opacity: 0.9;'>Maximum Accuracy System - Top {len(top)} Elite Picks</p>
-        </div>
-        
-        <div class='stats'>
-            <div class='stat-box'>
-                <div class='number'>{len(df2)}</div>
-                <div class='label'>Total Fixtures</div>
-            </div>
-            <div class='stat-box'>
-                <div class='number'>{len(meaningful)}</div>
-                <div class='label'>High Quality</div>
-            </div>
-            <div class='stat-box'>
-                <div class='number'>{df2['BestProb'].max():.0%}</div>
-                <div class='label'>Best Probability</div>
-            </div>
-            <div class='stat-box'>
-                <div class='number'>{df2['AvgConfidence'].mean():.0%}</div>
-                <div class='label'>Avg Confidence</div>
-            </div>
-        </div>
-        
-        <table>
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Date</th>
-                    <th>League</th>
-                    <th>Fixture</th>
-                    <th>Market</th>
-                    <th>Pick</th>
-                    <th>Probability</th>
-                    <th>Confidence</th>
-                </tr>
-            </thead>
-            <tbody>"""
-    
-    for i, (_, r) in enumerate(top.iterrows(), 1):
-        market, selection = parse_market(r['BestMarket'])
-        prob = r['BestProb']
-        conf = r.get('AvgConfidence', 0.5)
-        
-        # Row styling
-        if prob >= 0.85 and conf >= 0.75:
-            row_class = "elite"
-        elif prob >= 0.75:
-            row_class = "high"
-        elif prob >= 0.65:
-            row_class = "medium"
-        else:
-            row_class = ""
-        
-        # Confidence badge
-        if conf >= 0.7:
-            conf_class = "conf-high"
-        else:
-            conf_class = "conf-med"
-        
-        # Source badge
-        source = "BLEND" if r['BestMarket'].startswith("BLEND_") else ("DC" if r['BestMarket'].startswith("DC_") else "ML")
-        
-        html += f"""
-                <tr class='{row_class}'>
-                    <td class='rank'>{i}</td>
-                    <td>{str(r['Date']).split()[0]}</td>
-                    <td><strong>{r['League']}</strong></td>
-                    <td>{r['HomeTeam']}<br><small>vs {r['AwayTeam']}</small></td>
-                    <td>{market}</td>
-                    <td>{selection} <span class='badge badge-blend'>{source}</span></td>
-                    <td class='prob'>{prob:.1%}</td>
-                    <td><span class='confidence {conf_class}'>{conf:.0%}</span></td>
-                </tr>"""
-    
-    html += """
-            </tbody>
-        </table>
-    </div>
-</body>
-</html>"""
     
     out_path = path / "top50_ultimate.html"
     out_path.write_text(html, encoding="utf-8")
-    print(f"✅ Wrote ULTIMATE HTML -> {out_path}")
+    print(f" Wrote ULTIMATE HTML -> {out_path}")
 
     if secondary_path:
         secondary_path.mkdir(parents=True, exist_ok=True)
         secondary_out = secondary_path / "top50_ultimate.html"
         secondary_out.write_text(html, encoding="utf-8")
-        print(f"✅ Wrote ULTIMATE HTML (copy) -> {secondary_out}")
+        print(f" Wrote ULTIMATE HTML (copy) -> {secondary_out}")
 
     # Generate second version excluding O/U 0.5
     if top_no_ou05 is not None and len(top_no_ou05) > 0:
@@ -1095,17 +899,17 @@ def _write_enhanced_html(df: pd.DataFrame, path: Path, secondary_path: Path = No
 
         out_path_no_ou05 = path / "top50_ultimate_no_ou05.html"
         out_path_no_ou05.write_text(html_no_ou05, encoding="utf-8")
-        print(f"✅ Wrote ULTIMATE HTML (No O/U 0.5) -> {out_path_no_ou05}")
+        print(f" Wrote ULTIMATE HTML (No O/U 0.5) -> {out_path_no_ou05}")
 
         if secondary_path:
             secondary_out_no_ou05 = secondary_path / "top50_ultimate_no_ou05.html"
             secondary_out_no_ou05.write_text(html_no_ou05, encoding="utf-8")
-            print(f"✅ Wrote ULTIMATE HTML (No O/U 0.5, copy) -> {secondary_out_no_ou05}")
+            print(f" Wrote ULTIMATE HTML (No O/U 0.5, copy) -> {secondary_out_no_ou05}")
 
 def predict_week(fixtures_csv: Path) -> Path:
     """ULTIMATE prediction pipeline"""
     
-    log_header("🎯 ULTIMATE WEEKLY PREDICTIONS")
+    log_header(" ULTIMATE WEEKLY PREDICTIONS")
     print("Maximum Accuracy Features:")
     print("  • League-specific calibration")
     print("  • Cross-market constraints")
@@ -1121,7 +925,7 @@ def predict_week(fixtures_csv: Path) -> Path:
     
     # Load fixtures
     fx = pd.read_csv(fixtures_csv)
-    fx["Date"] = pd.to_datetime(fx["Date"])
+    fx["Date"] = pd.to_datetime(fx["Date"], dayfirst=True, errors='coerce')
     
     # Build features
     log_header("BUILD ENHANCED FEATURES")
@@ -1156,9 +960,9 @@ def predict_week(fixtures_csv: Path) -> Path:
             if col in dc_df.columns:
                 df_out[col] = dc_df[col].values[:len(df_out)]
         
-        print(f"✅ Merged {len(dc_cols)} DC predictions")
+        print(f" Merged {len(dc_cols)} DC predictions")
     except Exception as e:
-        print(f"⚠️ DC predictions failed: {e}")
+        print(f" DC predictions failed: {e}")
     
     # Apply enhanced blending
     log_header("APPLY DYNAMIC BLENDING")
@@ -1172,12 +976,17 @@ def predict_week(fixtures_csv: Path) -> Path:
     if 'Date' in df_out.columns:
         df_out['Date'] = pd.to_datetime(df_out['Date'], errors='coerce')
         df_out = df_out.sort_values(['Date', 'League'], ascending=[True, True])
-        print("✅ Sorted output by Date and League")
+        print(" Sorted output by Date and League")
 
     # Save
     output_path = OUTPUT_DIR / "weekly_bets_lite.csv"
     df_out.to_csv(output_path, index=False)
-    print(f"\n✅ Saved predictions: {output_path}")
+    print(f"\n Saved predictions: {output_path}")
+
+    # Also save as weekly_bets.csv for compatibility with downstream tools
+    output_path_compat = OUTPUT_DIR / "weekly_bets.csv"
+    df_out.to_csv(output_path_compat, index=False)
+    print(f" Saved predictions (compat): {output_path_compat}")
     
     # Generate HTML
     log_header("GENERATE REPORTS")
@@ -1186,7 +995,7 @@ def predict_week(fixtures_csv: Path) -> Path:
     
     # Summary
     print(f"\n{'='*60}")
-    print(f"📊 ULTIMATE PREDICTION SUMMARY")
+    print(f" ULTIMATE PREDICTION SUMMARY")
     print(f"{'='*60}")
     print(f"Total matches: {len(df_out)}")
     print(f"Leagues: {df_out['League'].unique().tolist() if 'League' in df_out.columns else 'N/A'}")

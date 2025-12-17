@@ -504,21 +504,4 @@ if __name__ == "__main__":
     if predictions_file.exists():
         optimize_weekly_predictions(predictions_file, historical_file, output_file)
     else:
-        print("No predictions file found!") 'BTTS Yes',
-                            'Our_Prob': our_prob,
-                            'Market_Prob': implied_prob,
-                            'Edge': edge,
-                            'Kelly': self.kelly_criterion(our_prob, market_odds)
-                        })
-            
-            # Check Over 2.5 market
-            if 'BLEND_OU_2_5_O' in row and 'B365>2.5' in row:
-                our_prob = row['BLEND_OU_2_5_O']
-                market_odds = row.get('B365>2.5', 0)
-                if market_odds > 0:
-                    implied_prob = 1 / market_odds
-                    edge = our_prob - implied_prob
-                    if edge > min_edge:
-                        value_bets.append({
-                            'Match': f"{row['HomeTeam']} vs {row['AwayTeam']}",
-                            'Market':
+        print("No predictions file found!")

@@ -78,7 +78,7 @@ class AccuracyTracker:
         conn.commit()
         conn.close()
         
-        print(f"✅ Database initialized: {self.db_path}")
+        print(f" Database initialized: {self.db_path}")
     
     def log_predictions(self, predictions_df: pd.DataFrame, week_id: str):
         """
@@ -134,7 +134,7 @@ class AccuracyTracker:
         # Insert into database
         if records:
             pd.DataFrame(records).to_sql('predictions', conn, if_exists='append', index=False)
-            print(f"✅ Logged {len(records)} predictions for week {week_id}")
+            print(f" Logged {len(records)} predictions for week {week_id}")
         
         conn.close()
     
@@ -187,7 +187,7 @@ class AccuracyTracker:
         conn.commit()
         conn.close()
         
-        print(f"✅ Updated {updated_count} predictions with actual results")
+        print(f" Updated {updated_count} predictions with actual results")
     
     def calculate_weekly_accuracy(self, week_id: str):
         """Calculate accuracy metrics for a specific week"""
@@ -233,7 +233,7 @@ class AccuracyTracker:
         conn.commit()
         conn.close()
         
-        print(f"✅ Calculated accuracy metrics for week {week_id}")
+        print(f" Calculated accuracy metrics for week {week_id}")
     
     def get_market_weights(self, lookback_weeks: int = 12) -> pd.DataFrame:
         """
@@ -288,7 +288,7 @@ class AccuracyTracker:
         conn.commit()
         conn.close()
         
-        print(f"✅ Updated weights for {len(df)} market/league combinations")
+        print(f" Updated weights for {len(df)} market/league combinations")
         return df
     
     def get_market_rankings(self) -> pd.DataFrame:
@@ -331,7 +331,7 @@ class AccuracyTracker:
         conn.close()
         
         df.to_csv(output_path, index=False)
-        print(f"✅ Exported accuracy report: {output_path}")
+        print(f" Exported accuracy report: {output_path}")
         return df
 
 
@@ -354,7 +354,7 @@ def log_weekly_predictions(predictions_csv: Path, week_id: Optional[str] = None)
         tracker.log_predictions(df, week_id)
         return True
     except Exception as e:
-        print(f"⚠️ Failed to log predictions: {e}")
+        print(f" Failed to log predictions: {e}")
         return False
 
 
@@ -379,7 +379,7 @@ def update_with_results(results_csv: Path):
         
         return True
     except Exception as e:
-        print(f"⚠️ Failed to update results: {e}")
+        print(f" Failed to update results: {e}")
         return False
 
 
@@ -400,7 +400,7 @@ def get_current_weights() -> Dict[str, float]:
 # ============================================================================
 
 if __name__ == "__main__":
-    print("🎯 Accuracy Tracking System")
+    print(" Accuracy Tracking System")
     print("="*50)
     
     tracker = AccuracyTracker()
@@ -413,5 +413,5 @@ if __name__ == "__main__":
     else:
         print("No data yet - start logging predictions!")
     
-    print("\n📊 Export report:")
+    print("\n Export report:")
     tracker.export_accuracy_report()

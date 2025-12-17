@@ -70,11 +70,11 @@ FOOTBALL_DATA_ORG_BASE = "https://api.football-data.org/v4"
 RANDOM_SEED = 42
 GLOBAL_SEED = RANDOM_SEED
 
-# --- Modeling ---
-PRIMARY_TARGETS = ["FTR", "OU25"]
+# --- Modeling - DC-ONLY with BTTS and O/U (0.5-5.5) ---
+PRIMARY_TARGETS = ["BTTS", "OU"]  # Dixon-Coles only: BTTS and Over/Under
 USE_ELO = True
-USE_ROLLING_FORM = True  
-USE_MARKET_FEATURES = True
+USE_ROLLING_FORM = True
+USE_MARKET_FEATURES = False  # DC doesn't need market odds features
 
 TRAIN_SEASONS_BACK = int(os.environ.get("FOOTY_TRAIN_SEASONS_BACK", 8))
 
@@ -94,4 +94,4 @@ EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
 EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "")
 
-print(f"📁 Output directory: {OUTPUT_DIR}")
+print(f"Output directory: {OUTPUT_DIR}")
