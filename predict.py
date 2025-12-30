@@ -274,13 +274,19 @@ def _build_future_frame(fixtures_csv: Path) -> pd.DataFrame:
         if hrow.empty or arow.empty:
             continue
         
+        # Exclude metadata columns from feature aggregation
+        metadata_cols = ["fixture_id", "Date", "League", "HomeTeam", "AwayTeam",
+                        "LeagueName", "LeagueType", "Season", "Round",
+                        "HomeTeamID", "AwayTeamID", "Referee", "Venue"]
+
         feat_cols = [c for c in base.columns if not c.startswith("y_")
-                     and c not in ["FTHG","FTAG","FTR","HTHG","HTAG","HTR","days_ago","time_weight"]]
+                     and c not in ["FTHG","FTAG","FTR","HTHG","HTAG","HTR","days_ago","time_weight"]
+                     and c not in metadata_cols]
 
         # Build row as dict first (much faster than DataFrame operations)
         fused_dict = {}
 
-        # Calculate weighted features for home team
+        # Calculate weighted features for home team (only actual features, not metadata)
         for col in feat_cols:
             if col in hrow.columns and hrow[col].dtype in ['float64', 'int64']:
                 weights = hrow['time_weight'].values[-5:]
@@ -292,22 +298,35 @@ def _build_future_frame(fixtures_csv: Path) -> pd.DataFrame:
             else:
                 fused_dict[col] = hrow[col].iloc[-1] if len(hrow) > 0 else 0
 
-        # Update away team features
-        for c in list(fused_dict.keys()):
-            if c.startswith("Away_") and c in arow.columns:
-                if arow[c].dtype in ['float64', 'int64']:
+        # Update away team features using away team's recent form
+        for col in feat_cols:
+            if col.startswith("Away_") and col in arow.columns:
+                if arow[col].dtype in ['float64', 'int64']:
                     weights = arow['time_weight'].values[-5:]
-                    values = arow[c].fillna(0).values[-5:]
+                    values = arow[col].fillna(0).values[-5:]
                     if weights.sum() > 0:
-                        fused_dict[c] = np.average(values, weights=weights)
+                        fused_dict[col] = np.average(values, weights=weights)
+                    else:
+                        fused_dict[col] = arow[col].iloc[-1] if len(arow) > 0 else 0
                 else:
-                    fused_dict[c] = arow[c].iloc[-1] if len(arow) > 0 else 0
+                    fused_dict[col] = arow[col].iloc[-1] if len(arow) > 0 else 0
 
-        # Add metadata
+        # Add metadata from the actual fixture (not from historical matches)
         fused_dict["League"] = lg
         fused_dict["Date"] = dt
         fused_dict["HomeTeam"] = ht
         fused_dict["AwayTeam"] = at
+
+        # Add required metadata columns (preprocessor expects these)
+        fused_dict["fixture_id"] = 0  # Placeholder for future fixtures
+        fused_dict["LeagueName"] = "Premier League" if lg == "E0" else "Unknown"
+        fused_dict["LeagueType"] = "league"
+        fused_dict["Season"] = dt.year if pd.notna(dt) else 2025
+        fused_dict["Round"] = "Regular Season"
+        fused_dict["HomeTeamID"] = 0  # Placeholder
+        fused_dict["AwayTeamID"] = 0  # Placeholder
+        fused_dict["Referee"] = "Unknown"
+        fused_dict["Venue"] = "Unknown"
 
         # Add dummy values for match outcome columns (not yet known for future fixtures)
         # Use np.nan (not pd.NA) for numeric compatibility with sklearn
