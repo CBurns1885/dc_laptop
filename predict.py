@@ -274,51 +274,62 @@ def _build_future_frame(fixtures_csv: Path) -> pd.DataFrame:
         if hrow.empty or arow.empty:
             continue
         
-        feat_cols = [c for c in base.columns if not c.startswith("y_") 
+        feat_cols = [c for c in base.columns if not c.startswith("y_")
                      and c not in ["FTHG","FTAG","FTR","HTHG","HTAG","HTR","days_ago","time_weight"]]
-        
-        fused = pd.DataFrame()
-        
+
+        # Build row as dict first (much faster than DataFrame operations)
+        fused_dict = {}
+
         # Calculate weighted features for home team
         for col in feat_cols:
             if col in hrow.columns and hrow[col].dtype in ['float64', 'int64']:
                 weights = hrow['time_weight'].values[-5:]
                 values = hrow[col].fillna(0).values[-5:]
                 if weights.sum() > 0:
-                    weighted_avg = np.average(values, weights=weights)
-                    fused.at[0, col] = weighted_avg
+                    fused_dict[col] = np.average(values, weights=weights)
                 else:
-                    fused.at[0, col] = hrow[col].iloc[-1] if len(hrow) > 0 else 0
+                    fused_dict[col] = hrow[col].iloc[-1] if len(hrow) > 0 else 0
             else:
-                fused.at[0, col] = hrow[col].iloc[-1] if len(hrow) > 0 else 0
-        
+                fused_dict[col] = hrow[col].iloc[-1] if len(hrow) > 0 else 0
+
         # Update away team features
-        for c in fused.columns:
+        for c in list(fused_dict.keys()):
             if c.startswith("Away_") and c in arow.columns:
                 if arow[c].dtype in ['float64', 'int64']:
                     weights = arow['time_weight'].values[-5:]
                     values = arow[c].fillna(0).values[-5:]
                     if weights.sum() > 0:
-                        weighted_avg = np.average(values, weights=weights)
-                        fused.at[0, c] = weighted_avg
+                        fused_dict[c] = np.average(values, weights=weights)
                 else:
-                    fused.at[0, c] = arow[c].iloc[-1] if len(arow) > 0 else 0
-        
-        fused["League"] = lg
-        fused["Date"] = dt
-        fused["HomeTeam"] = ht
-        fused["AwayTeam"] = at
-        
+                    fused_dict[c] = arow[c].iloc[-1] if len(arow) > 0 else 0
+
+        # Add metadata
+        fused_dict["League"] = lg
+        fused_dict["Date"] = dt
+        fused_dict["HomeTeam"] = ht
+        fused_dict["AwayTeam"] = at
+
+        # Add dummy values for match outcome columns (not yet known for future fixtures)
+        # Use np.nan (not pd.NA) for numeric compatibility with sklearn
+        fused_dict["FTHG"] = np.nan
+        fused_dict["FTAG"] = np.nan
+        fused_dict["FTR"] = np.nan
+        fused_dict["HTHG"] = np.nan  # Required by preprocessor
+        fused_dict["HTAG"] = np.nan  # Required by preprocessor
+        fused_dict["HTR"] = np.nan
+
+        # Add target columns as NaN
         for c in base.columns:
             if c.startswith("y_"):
-                fused[c] = pd.NA
-        
-        rows.append(fused)
+                fused_dict[c] = np.nan
+
+        rows.append(fused_dict)
     
     if not rows:
         raise RuntimeError("No fixtures matched with historical features.")
-    
-    return pd.concat(rows, ignore_index=True).sort_values(["League","Date","HomeTeam"])
+
+    # Convert list of dicts to DataFrame (much faster than concat of DataFrames)
+    return pd.DataFrame(rows).sort_values(["League","Date","HomeTeam"])
 
 def _collect_market_columns() -> List[str]:
     """All expected probability column names"""

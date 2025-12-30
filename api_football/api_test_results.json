@@ -1,0 +1,13 @@
+{
+  "status": true,
+  "leagues": true,
+  "fixtures_hist": true,
+  "stats": true,
+  "events": true,
+  "fixtures_upcoming": false,
+  "h2h": true,
+  "team_stats": true,
+  "injuries": true,
+  "standings": true,
+  "odds": false
+}
