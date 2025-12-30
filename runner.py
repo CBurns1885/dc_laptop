@@ -432,9 +432,9 @@ try:
         output_path = OUTPUT_DIR / "weekly_bets_lite_optimized.csv"
 
         if csv_path.exists():
-            import pandas as pd
-            hist_df = pd.read_parquet(hist_path) if hist_path.exists() else None
-            optimize_weekly_predictions(csv_path, hist_df, output_path)
+            # Pass the Path object (not the DataFrame) - let the function handle loading
+            hist_file = hist_path if hist_path.exists() else None
+            optimize_weekly_predictions(csv_path, hist_file, output_path)
 
             import shutil
             shutil.copy(output_path, csv_path)
@@ -490,12 +490,13 @@ try:
     # Step 12: O/U Accumulators
     def step12_acca():
         from generate_outputs_from_actual import generate_ou_accumulators
-        csv_path = OUTPUT_DIR / "high_confidence_bets.csv"
+        # File is saved to outputs/ not outputs/2025-12-29/
+        csv_path = Path("outputs") / "high_confidence_bets.csv"
 
         if csv_path.exists():
             generate_ou_accumulators(csv_path)
         else:
-            raise FileNotFoundError("high_confidence_bets.csv not found")
+            raise FileNotFoundError(f"high_confidence_bets.csv not found at {csv_path}")
 
     run_step(12, "O/U ACCUMULATORS (4-FOLD, 90%+)", step12_acca)
 
