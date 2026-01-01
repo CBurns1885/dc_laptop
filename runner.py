@@ -37,9 +37,9 @@ os.environ["EMAIL_SENDER"] = "christopher_burns@live.co.uk"
 os.environ["EMAIL_PASSWORD"] = ""
 os.environ["EMAIL_RECIPIENT"] = "christopher_burns@live.co.uk"
 
-# Training Configuration - Include 2024/25 season data
+# Training Configuration - Include 2024/25 and 2025/26 season data
 TRAINING_START_YEAR = 2024
-TRAINING_SEASONS = [2024, 2025]  # 2024/25 season for proper training
+TRAINING_SEASONS = [2024, 2025]  # Both seasons for better training data (~14,000 matches)
 
 # League Configuration - START WITH E0 FOR TESTING
 #LEAGUES_TO_USE = ['E0']  # Premier League only for test
