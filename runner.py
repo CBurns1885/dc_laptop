@@ -137,38 +137,60 @@ if not SKIP_DATA_INGESTION:
         db_path = Path(__file__).parent.parent / "data" / "football_api.db"  # Shared data folder
 
         needs_full_download = False
+        leagues_needing_download = []
 
         if not db_path.exists():
             print("  Database doesn't exist - will download full history")
             needs_full_download = True
+            leagues_needing_download = LEAGUES_TO_USE
         else:
-            # Check if we have ANY historical data
+            # Check which leagues have sufficient historical data
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
 
                 # Check total fixtures in database
                 cursor.execute("SELECT COUNT(*) FROM fixtures")
                 total_fixtures = cursor.fetchone()[0]
+                print(f"  Database has {total_fixtures:,} total fixtures")
 
-                if total_fixtures < 500:
-                    # Database exists but has very little data - needs full download
-                    print(f"  Database has only {total_fixtures} fixtures - will download full history")
+                # Check per league for the training seasons
+                cursor.execute("""
+                    SELECT league_code, COUNT(*) as fixture_count
+                    FROM fixtures
+                    WHERE league_code IN ({})
+                    AND season IN ({})
+                    AND status = 'FT'
+                    GROUP BY league_code
+                """.format(
+                    ','.join(['?'] * len(LEAGUES_TO_USE)),
+                    ','.join(['?'] * len(TRAINING_SEASONS))
+                ), LEAGUES_TO_USE + TRAINING_SEASONS)
+
+                existing_leagues = {row[0]: row[1] for row in cursor.fetchall()}
+
+                # Identify leagues that need downloading (< 200 fixtures across all training seasons)
+                for league in LEAGUES_TO_USE:
+                    count = existing_leagues.get(league, 0)
+                    if count < 200:
+                        leagues_needing_download.append(league)
+
+                if leagues_needing_download:
+                    print(f"  Leagues needing download ({len(leagues_needing_download)}): {', '.join(leagues_needing_download)}")
                     needs_full_download = True
                 else:
-                    # Database has good historical data - just do incremental updates
-                    print(f"  ✓ Database has {total_fixtures:,} fixtures - doing incremental update only")
+                    print(f"  ✓ All {len(LEAGUES_TO_USE)} leagues have sufficient data - incremental update only")
 
         ingestor = APIFootballIngestor(API_KEY)
 
         if needs_full_download:
             print(f"\nDownloading historical data from API-Football...")
-            print(f"  Leagues: {LEAGUES_TO_USE}")
+            print(f"  Leagues to download: {leagues_needing_download}")
             print(f"  Seasons: {TRAINING_SEASONS}")
             print(f"  Note: Will automatically SKIP league/seasons already in database (≥300 fixtures)")
             print(f"  This saves API calls and prevents re-downloading!")
 
             ingestor.ingest_all(
-                leagues=LEAGUES_TO_USE,
+                leagues=leagues_needing_download,  # Only download leagues that need it
                 seasons=TRAINING_SEASONS,
                 include_stats=True,
                 include_injuries=True,
