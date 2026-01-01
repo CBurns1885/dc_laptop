@@ -37,17 +37,21 @@ os.environ["EMAIL_SENDER"] = "christopher_burns@live.co.uk"
 os.environ["EMAIL_PASSWORD"] = ""
 os.environ["EMAIL_RECIPIENT"] = "christopher_burns@live.co.uk"
 
-# Training Configuration - TEST WITH E0 ONLY
-TRAINING_START_YEAR = 2025 #mtch original system
-TRAINING_SEASONS = [ 2025]  # Full history for proper training
+# Training Configuration - Include 2024/25 season data
+TRAINING_START_YEAR = 2024
+TRAINING_SEASONS = [2024, 2025]  # 2024/25 season for proper training
 
 # League Configuration - START WITH E0 FOR TESTING
-LEAGUES_TO_USE = ['E0']  # Premier League only for test
+#LEAGUES_TO_USE = ['E0']  # Premier League only for test
 
 # After successful test, expand to all leagues:
-# LEAGUES_TO_USE = ['E0', 'E1', 'E2', 'E3', 'EC', 'D1', 'D2', 'SP1', 'SP2',
-#                   'I1', 'I2', 'F1', 'F2', 'N1', 'B1', 'P1', 'G1',
-#                   'SC0', 'SC1', 'T1']
+LEAGUES_TO_USE = ['E0', 'E1', 'E2', 'E3', 'EC', 'D1', 'D2', 'SP1', 'SP2',
+                  'I1', 'I2', 'F1', 'F2', 'N1', 'B1', 'P1', 'G1',
+                  'SC0', 'SC1', 'T1']
+
+# Skip data ingestion step (useful if you hit API limit and want to continue)
+# Set to True to skip downloading data and use existing database
+SKIP_DATA_INGESTION = False  # Change to True to skip step 0
 
 print("="*70)
 print("API-FOOTBALL ENHANCED PREDICTION SYSTEM")
@@ -108,44 +112,137 @@ except Exception as e:
 # STEP 0: API-FOOTBALL DATA INGESTION
 # ============================================================================
 
-print("\n[0] DATA INGESTION - API-FOOTBALL")
-print("="*70)
+if not SKIP_DATA_INGESTION:
+    print("\n[0] DATA INGESTION - API-FOOTBALL")
+    print("="*70)
+else:
+    print("\n[0] DATA INGESTION - SKIPPED (using existing database)")
+    print("="*70)
 
-try:
-    # Import API-Football modules without polluting global path
+if not SKIP_DATA_INGESTION:
+    try:
+        # Import API-Football modules without polluting global path
+        api_football_dir = Path(__file__).parent / "api_football"
+
+        # Temporarily add to path for import
+        sys.path.insert(0, str(api_football_dir))
+        from data_ingest_api import APIFootballIngestor, update_recent
+        from features_api import build_features as build_api_features
+        from predict_api import MatchPredictor
+        # Remove from path to avoid conflicts with old system
+        sys.path.remove(str(api_football_dir))
+
+        # Check if we need full historical download or just incremental update
+        import sqlite3
+        db_path = Path(__file__).parent.parent / "data" / "football_api.db"  # Shared data folder
+
+        needs_full_download = False
+
+        if not db_path.exists():
+            print("  Database doesn't exist - will download full history")
+            needs_full_download = True
+        else:
+            # Check if we have ANY historical data
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+
+                # Check total fixtures in database
+                cursor.execute("SELECT COUNT(*) FROM fixtures")
+                total_fixtures = cursor.fetchone()[0]
+
+                if total_fixtures < 500:
+                    # Database exists but has very little data - needs full download
+                    print(f"  Database has only {total_fixtures} fixtures - will download full history")
+                    needs_full_download = True
+                else:
+                    # Database has good historical data - just do incremental updates
+                    print(f"  ✓ Database has {total_fixtures:,} fixtures - doing incremental update only")
+
+        ingestor = APIFootballIngestor(API_KEY)
+
+        if needs_full_download:
+            print(f"\nDownloading historical data from API-Football...")
+            print(f"  Leagues: {LEAGUES_TO_USE}")
+            print(f"  Seasons: {TRAINING_SEASONS}")
+            print(f"  Note: Will automatically SKIP league/seasons already in database (≥300 fixtures)")
+            print(f"  This saves API calls and prevents re-downloading!")
+
+            ingestor.ingest_all(
+                leagues=LEAGUES_TO_USE,
+                seasons=TRAINING_SEASONS,
+                include_stats=True,
+                include_injuries=True,
+                skip_complete=True,        # Skip league/seasons already complete
+                min_fixtures_threshold=300  # Consider complete if ≥300 fixtures
+            )
+        else:
+            print(f"\n✓ Historical data already complete - doing incremental update only")
+            print(f"  Updating recent fixtures from last 7 days...")
+
+            parquet_path = update_recent(
+                api_key=API_KEY,
+                days=7,
+                leagues=LEAGUES_TO_USE
+            )
+            print(f"  Updated {len(LEAGUES_TO_USE)} leagues")
+
+        # Export to parquet for features step
+        parquet_path = ingestor.export_to_parquet()
+        print(f"Data exported to: {parquet_path}")
+
+    except Exception as e:
+        if "API_RATE_LIMIT_EXCEEDED" in str(e):
+            # Graceful handling of rate limit - export what we have and CONTINUE
+            print("\nExporting data collected so far...")
+            try:
+                parquet_path = ingestor.export_to_parquet()
+                print(f"✓ Data exported to: {parquet_path}")
+
+                # Check what we have
+                import pandas as pd
+                df = pd.read_parquet(parquet_path)
+                print(f"✓ Total fixtures in database: {len(df)}")
+
+                # Show progress
+                import sqlite3
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT league_code, season, COUNT(*)
+                    FROM fixtures
+                    GROUP BY league_code, season
+                    HAVING COUNT(*) >= 300
+                    ORDER BY league_code, season
+                """)
+                completed = cursor.fetchall()
+                print(f"\n✓ Completed league/seasons: {len(completed)}")
+                for league, season, count in completed[:5]:  # Show first 5
+                    print(f"  - {league} {season}: {count} fixtures")
+                if len(completed) > 5:
+                    print(f"  ... and {len(completed) - 5} more")
+
+                print("\n✓ Progress saved - continuing with predictions using existing data...")
+                conn.close()
+                # Don't exit - continue to next steps!
+            except Exception as export_error:
+                print(f"Error exporting data: {export_error}")
+                print("Continuing anyway...")
+        else:
+            # Other errors - still try to continue if we have some data
+            print(f"WARNING: Data ingestion failed: {e}")
+            import traceback
+            traceback.print_exc()
+            print("\nAttempting to continue with existing data...")
+            # Don't exit - try to continue
+else:
+    # SKIP_DATA_INGESTION = True, so we need to import modules for later steps
     api_football_dir = Path(__file__).parent / "api_football"
-
-    # Temporarily add to path for import
     sys.path.insert(0, str(api_football_dir))
     from data_ingest_api import APIFootballIngestor
     from features_api import build_features as build_api_features
     from predict_api import MatchPredictor
-    # Remove from path to avoid conflicts with old system
     sys.path.remove(str(api_football_dir))
-
-    print(f"Downloading historical data from API-Football...")
-    print(f"  Leagues: {LEAGUES_TO_USE}")
-    print(f"  Seasons: {TRAINING_SEASONS}")
-    print(f"  This will download all historical matches with xG, injuries, etc.")
-
-    ingestor = APIFootballIngestor(API_KEY)
-    ingestor.ingest_all(
-        leagues=LEAGUES_TO_USE,
-        seasons=TRAINING_SEASONS,
-        include_stats=True,
-        include_injuries=True
-    )
-
-    # Export to parquet for features step
-    parquet_path = ingestor.export_to_parquet()
-    print(f"Data exported to: {parquet_path}")
-
-except Exception as e:
-    print(f"ERROR: Data ingestion failed: {e}")
-    import traceback
-    traceback.print_exc()
-    print("\nCannot continue without data. Exiting.")
-    sys.exit(1)
+    print("✓ Using existing database - skipping download")
 
 # ============================================================================
 # STEP 1: BUILD FEATURES (API-FOOTBALL ENHANCED)
@@ -198,7 +295,7 @@ try:
     # Map to standard format expected by old system
     # The old system expects: data/processed/historical_matches.parquet
 
-    standard_path = Path("data/processed/historical_matches.parquet")
+    standard_path = Path(__file__).parent.parent / "data" / "processed" / "historical_matches.parquet"
     standard_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Ensure required columns exist
@@ -230,7 +327,7 @@ print("="*70)
 try:
     # The API features are already in the correct format and location
     # DO NOT call old build_features() - it would overwrite with CSV data lacking HTHG/HTAG
-    features_file = Path("data/processed/historical_matches.parquet")
+    features_file = Path(__file__).parent.parent / "data" / "processed" / "historical_matches.parquet"
 
     if features_file.exists():
         import pandas as pd
@@ -428,7 +525,7 @@ try:
     def step8_optimize():
         from btts_ou_optimizer import optimize_weekly_predictions
         csv_path = OUTPUT_DIR / "weekly_bets_lite.csv"
-        hist_path = Path("data/historical_results.parquet")
+        hist_path = Path(__file__).parent.parent / "data" / "historical_results.parquet"
         output_path = OUTPUT_DIR / "weekly_bets_lite_optimized.csv"
 
         if csv_path.exists():
