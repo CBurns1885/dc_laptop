@@ -40,38 +40,38 @@ class MarketSplitter:
         """
         markets = {}
 
-        # Define markets and their probability columns
+        # Define markets and their probability columns (using DC predictions)
         market_configs = {
             '1X2': {
-                'prob_cols': ['P_1X2_H', 'P_1X2_D', 'P_1X2_A'],
+                'prob_cols': ['DC_1X2_H', 'DC_1X2_D', 'DC_1X2_A'],
                 'display_name': '1X2 (Match Result)'
             },
             'BTTS': {
-                'prob_cols': ['P_BTTS_Y', 'P_BTTS_N'],
+                'prob_cols': ['DC_BTTS_Y', 'DC_BTTS_N'],
                 'display_name': 'Both Teams To Score'
             },
             'OU_0_5': {
-                'prob_cols': ['P_OU_0_5_O', 'P_OU_0_5_U'],
+                'prob_cols': ['DC_OU_0_5_O', 'DC_OU_0_5_U'],
                 'display_name': 'Over/Under 0.5 Goals'
             },
             'OU_1_5': {
-                'prob_cols': ['P_OU_1_5_O', 'P_OU_1_5_U'],
+                'prob_cols': ['DC_OU_1_5_O', 'DC_OU_1_5_U'],
                 'display_name': 'Over/Under 1.5 Goals'
             },
             'OU_2_5': {
-                'prob_cols': ['P_OU_2_5_O', 'P_OU_2_5_U'],
+                'prob_cols': ['DC_OU_2_5_O', 'DC_OU_2_5_U'],
                 'display_name': 'Over/Under 2.5 Goals'
             },
             'OU_3_5': {
-                'prob_cols': ['P_OU_3_5_O', 'P_OU_3_5_U'],
+                'prob_cols': ['DC_OU_3_5_O', 'DC_OU_3_5_U'],
                 'display_name': 'Over/Under 3.5 Goals'
             },
             'OU_4_5': {
-                'prob_cols': ['P_OU_4_5_O', 'P_OU_4_5_U'],
+                'prob_cols': ['DC_OU_4_5_O', 'DC_OU_4_5_U'],
                 'display_name': 'Over/Under 4.5 Goals'
             },
             'OU_5_5': {
-                'prob_cols': ['P_OU_5_5_O', 'P_OU_5_5_U'],
+                'prob_cols': ['DC_OU_5_5_O', 'DC_OU_5_5_U'],
                 'display_name': 'Over/Under 5.5 Goals'
             },
         }
@@ -97,12 +97,19 @@ class MarketSplitter:
             # Create market-specific DataFrame
             market_df = self.df[cols_to_include].copy()
 
+            # Rename DC_ columns to P_ for consistency and CSV output
+            rename_map = {col: col.replace('DC_', 'P_') for col in available_cols}
+            market_df = market_df.rename(columns=rename_map)
+
+            # Update available_cols to use new names
+            renamed_cols = [col.replace('DC_', 'P_') for col in available_cols]
+
             # Add predicted outcome column
-            market_df = self._add_prediction_column(market_df, available_cols, market_key)
+            market_df = self._add_prediction_column(market_df, renamed_cols, market_key)
 
             # Add confidence column (max probability)
-            if available_cols:
-                market_df['Confidence'] = market_df[available_cols].max(axis=1)
+            if renamed_cols:
+                market_df['Confidence'] = market_df[renamed_cols].max(axis=1)
                 market_df['Confidence_%'] = (market_df['Confidence'] * 100).round(1)
 
             # Sort by date, then league, then confidence (highest first)
